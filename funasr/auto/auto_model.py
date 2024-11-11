@@ -481,6 +481,7 @@ class AutoModel:
                     j < n - 1
                     and sample_length < batch_size_threshold_ms
                     and potential_batch_length < batch_size
+                    and j + 1 - beg_idx < 10
                 ):
                     max_len_in_batch = max(max_len_in_batch, sample_length)
                     end_idx += 1
