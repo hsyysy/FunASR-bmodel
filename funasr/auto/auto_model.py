@@ -143,6 +143,7 @@ class AutoModel:
             punc_kwargs["model"] = punc_model
             punc_kwargs["model_revision"] = kwargs.get("punc_model_revision", "master")
             punc_kwargs["device"] = kwargs["device"]
+            punc_kwargs["dev_id"] = kwargs["dev_id"]
             punc_model, punc_kwargs = self.build_model(**punc_kwargs)
 
         # if spk_model is not None, build spk model else None

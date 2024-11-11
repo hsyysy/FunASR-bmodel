@@ -17,6 +17,7 @@ from funasr.train_utils.device_funcs import force_gatherable
 from funasr.utils.load_utils import load_audio_text_image_video
 from funasr.models.transformer.utils.nets_utils import make_pad_mask
 from funasr.models.ct_transformer.utils import split_to_mini_sentence, split_words
+from funasr.utils.run_bmodel import EngineOV
 
 try:
     import jieba
@@ -77,6 +78,8 @@ class CTTransformer(torch.nn.Module):
         if kwargs.get("jieba_usr_dict", None) is not None:
             jieba.load_userdict(kwargs["jieba_usr_dict"])
             self.jieba_usr_dict = jieba
+
+        self.punc_model = EngineOV("./bmodel/punc/punc_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
 
     def punc_forward(self, text: torch.Tensor, text_lengths: torch.Tensor, **kwargs):
         """Compute loss value from buffer sequences.
@@ -285,7 +288,11 @@ class CTTransformer(torch.nn.Module):
             }
             data = to_device(data, kwargs["device"])
             # y, _ = self.wrapped_model(**data)
-            y, _ = self.punc_forward(**data)
+            #y, _ = self.punc_forward(**data)
+            inputs = data["text"].type(torch.int32).detach().numpy()
+            text_lengths = data['text_lengths'].type(torch.int32).detach().numpy()
+            output = self.punc_model([inputs, text_lengths])
+            y = torch.from_numpy(output[0])
             _, indices = y.view(-1, y.shape[-1]).topk(1, dim=1)
             punctuations = torch.squeeze(indices, dim=1)
             assert punctuations.size()[0] == len(mini_sentence)
