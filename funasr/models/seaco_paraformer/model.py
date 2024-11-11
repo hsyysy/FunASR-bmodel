@@ -30,6 +30,9 @@ from funasr.utils.timestamp_tools import ts_prediction_lfr6_standard
 from funasr.models.transformer.utils.nets_utils import make_pad_mask, pad_list
 from funasr.utils.load_utils import load_audio_text_image_video, extract_fbank
 
+from funasr.utils.run_bmodel import EngineOV
+from funasr.models.bicif_paraformer.cif_predictor import cif
+from funasr.models.bicif_paraformer.cif_predictor import cif_wo_hidden
 
 if LooseVersion(torch.__version__) >= LooseVersion("1.6.0"):
     from torch.cuda.amp import autocast
@@ -103,6 +106,10 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         self.seaco_weight = kwargs.get("seaco_weight", 0.01)
         self.NO_BIAS = kwargs.get("NO_BIAS", 8377)
         self.predictor_name = kwargs.get("predictor")
+
+        self.encoder_bmodel = EngineOV("bmodel/asr_seaco/seaco_encoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        self.predictor_bmodel = EngineOV("bmodel/asr_seaco/seaco_predictor_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        self.decoder_bmodel = EngineOV("bmodel/asr_seaco/seaco_decoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
 
     def forward(
         self,
@@ -242,6 +249,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
     ):
         # decoder forward
 
+        """
         decoder_out, decoder_hidden, _ = self.decoder(
             encoder_out,
             encoder_out_lens,
@@ -252,6 +260,9 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         )
 
         decoder_pred = torch.log_softmax(decoder_out, dim=-1)
+        """
+        outputs = self.decoder_bmodel([encoder_out.detach().numpy(), encoder_out_lens.detach().numpy().astype(np.int32), sematic_embeds.detach().numpy(), ys_pad_lens.detach().numpy().astype(np.int32)])
+        decoder_pred, decoder_hidden = torch.from_numpy(outputs[0]), torch.from_numpy(outputs[1])
         if hw_list is not None:
             hw_lengths = [len(i) for i in hw_list]
             hw_list_ = [torch.Tensor(i).long() for i in hw_list]
@@ -404,16 +415,26 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         )
 
         # Encoder
-        encoder_out, encoder_out_lens = self.encode(speech, speech_lengths)
+        #encoder_out, encoder_out_lens = self.encode(speech, speech_lengths)
+        outputs = self.encoder_bmodel([speech.detach().numpy(), speech_lengths.detach().numpy()])
+        encoder_out = torch.from_numpy(outputs[0])
+        encoder_out_lens = speech_lengths
         if isinstance(encoder_out, tuple):
             encoder_out = encoder_out[0]
 
+        """
         # predictor
         predictor_outs = self.calc_predictor(encoder_out, encoder_out_lens)
         pre_acoustic_embeds, pre_token_length = predictor_outs[0], predictor_outs[1]
         pre_token_length = pre_token_length.round().long()
         if torch.max(pre_token_length) < 1:
             return ([],)
+        """
+        hidden, alphas, pre_token_length = torch.from_numpy(outputs[1]), torch.from_numpy(outputs[2]), torch.from_numpy(outputs[3])
+        pre_acoustic_embeds, pre_peak_index = cif(hidden, alphas, 1.0)
+        token_num_int = torch.max(pre_token_length).type(torch.int32).item()
+        pre_acoustic_embeds = pre_acoustic_embeds[:, :token_num_int, :]
+        pre_token_length = pre_token_length.round().long()
 
         decoder_out = self._seaco_decode_with_ASF(
             encoder_out,
@@ -425,9 +446,17 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
 
         # decoder_out, _ = decoder_outs[0], decoder_outs[1]
         if self.predictor_name == "CifPredictorV3":
+            outputs = self.predictor_bmodel([encoder_out.detach().numpy(), encoder_out_lens.detach().numpy().astype(np.int32)])
+            alphas2 = torch.from_numpy(outputs[0])
+            _token_num = torch.from_numpy(outputs[1])
+            token_num = pre_token_length
+            us_alphas = alphas2 * ((token_num / _token_num)[:, None].repeat(1, alphas2.size(1)))
+            us_peaks = cif_wo_hidden(us_alphas, 1.0 - 1e-4)
+            """
             _, _, us_alphas, us_peaks = self.calc_predictor_timestamp(
                 encoder_out, encoder_out_lens, pre_token_length
             )
+            """
         else:
             us_alphas = None
 
