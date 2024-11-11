@@ -14,7 +14,7 @@ import os.path
 import numpy as np
 from tqdm import tqdm
 
-from omegaconf import DictConfig, ListConfig, OmegaConf
+from omegaconf import DictConfig, ListConfig
 from funasr.utils.misc import deep_update
 from funasr.register import tables
 from funasr.utils.load_utils import load_bytes
@@ -294,6 +294,7 @@ class AutoModel:
         deep_update(model_conf, kwargs)
         model = model_class(**model_conf)
 
+        """
         # init_param
         init_param = kwargs.get("init_param", None)
         if init_param is not None:
@@ -309,6 +310,7 @@ class AutoModel:
                 )
             else:
                 print(f"error, init_param does not exist!: {init_param}")
+        """
 
         # fp16
         if kwargs.get("fp16", False):
