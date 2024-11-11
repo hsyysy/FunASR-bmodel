@@ -261,7 +261,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
 
         decoder_pred = torch.log_softmax(decoder_out, dim=-1)
         """
-        outputs = self.decoder_bmodel([encoder_out.detach().numpy(), encoder_out_lens.detach().numpy().astype(np.int32), sematic_embeds.detach().numpy(), ys_pad_lens.detach().numpy().astype(np.int32)])
+        outputs = self.decoder_bmodel([encoder_out.detach().cpu().numpy(), encoder_out_lens.detach().cpu().numpy().astype(np.int32), sematic_embeds.detach().cpu().numpy(), ys_pad_lens.detach().cpu().numpy().astype(np.int32)])
         decoder_pred, decoder_hidden = torch.from_numpy(outputs[0]), torch.from_numpy(outputs[1])
         if hw_list is not None:
             hw_lengths = [len(i) for i in hw_list]
@@ -419,7 +419,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
 
         # Encoder
         #encoder_out, encoder_out_lens = self.encode(speech, speech_lengths)
-        outputs = self.encoder_bmodel([speech.detach().numpy(), speech_lengths.detach().numpy()])
+        outputs = self.encoder_bmodel([speech.detach().cpu().numpy(), speech_lengths.detach().cpu().numpy()])
         encoder_out = torch.from_numpy(outputs[0])
         encoder_out_lens = speech_lengths
         if isinstance(encoder_out, tuple):
@@ -449,7 +449,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
 
         # decoder_out, _ = decoder_outs[0], decoder_outs[1]
         if self.predictor_name == "CifPredictorV3":
-            outputs = self.predictor_bmodel([encoder_out.detach().numpy(), encoder_out_lens.detach().numpy().astype(np.int32)])
+            outputs = self.predictor_bmodel([encoder_out.detach().cpu().numpy(), encoder_out_lens.detach().cpu().numpy().astype(np.int32)])
             alphas2 = torch.from_numpy(outputs[0])
             _token_num = torch.from_numpy(outputs[1])
             token_num = pre_token_length
