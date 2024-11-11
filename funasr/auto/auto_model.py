@@ -154,6 +154,7 @@ class AutoModel:
             spk_kwargs["model"] = spk_model
             spk_kwargs["model_revision"] = kwargs.get("spk_model_revision", "master")
             spk_kwargs["device"] = kwargs["device"]
+            spk_kwargs["dev_id"] = kwargs["dev_id"]
             spk_model, spk_kwargs = self.build_model(**spk_kwargs)
             self.cb_model = ClusterBackend(**cb_kwargs).to(kwargs["device"])
             spk_mode = kwargs.get("spk_mode", "punc_segment")

@@ -10,6 +10,7 @@ import numpy as np
 from collections import OrderedDict
 from contextlib import contextmanager
 from distutils.version import LooseVersion
+from funasr.utils.run_bmodel import EngineOV
 
 from funasr.register import tables
 from funasr.models.campplus.utils import extract_feature
@@ -50,6 +51,7 @@ class CAMPPlus(torch.nn.Module):
     ):
         super().__init__()
 
+        """
         self.head = FCM(feat_dim=feat_dim)
         channels = self.head.out_channels
         self.output_level = output_level
@@ -111,6 +113,8 @@ class CAMPPlus(torch.nn.Module):
                 torch.nn.init.kaiming_normal_(m.weight.data)
                 if m.bias is not None:
                     torch.nn.init.zeros_(m.bias)
+        """
+        self.bmodel = EngineOV("bmodel/spk/campplus_bm1684x_fp32_1b.bmodel", device_id=kwargs['dev_id'])
 
     def forward(self, x):
         x = x.permute(0, 2, 1)  # (B,T,F) => (B,F,T)
@@ -142,5 +146,5 @@ class CAMPPlus(torch.nn.Module):
         time3 = time.perf_counter()
         meta_data["extract_feat"] = f"{time3 - time2:0.3f}"
         meta_data["batch_data_time"] = np.array(speech_times).sum().item() / 16000.0
-        results = [{"spk_embedding": self.forward(speech.to(torch.float32))}]
+        results = [{"spk_embedding": torch.from_numpy(self.bmodel([speech.to(torch.float32).numpy()])[0])}]
         return results, meta_data
