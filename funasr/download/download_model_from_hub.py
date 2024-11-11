@@ -31,6 +31,15 @@ def download_from_ms(**kwargs):
     if model_or_path in name_maps_ms:
         model_or_path = name_maps_ms[model_or_path]
     model_revision = kwargs.get("model_revision", "master")
+    if kwargs["model"] == "iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch":
+        model_or_path = "./bmodel/asr_seaco"
+    elif kwargs["model"] == "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch":
+        model_or_path = "./bmodel/fsmn"
+    elif kwargs["model"] == "iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch":
+        model_or_path = "./bmodel/punc"
+    elif kwargs["model"] == "iic/speech_campplus_sv_zh-cn_16k-common":
+        model_or_path = "./bmodel/spk"
+    """
     if not os.path.exists(model_or_path) and "model_path" not in kwargs:
         try:
             model_or_path = get_or_download_model_dir(
@@ -41,6 +50,7 @@ def download_from_ms(**kwargs):
             )
         except Exception as e:
             print(f"Download: {model_or_path} failed!: {e}")
+    """
 
     kwargs["model_path"] = model_or_path if "model_path" not in kwargs else kwargs["model_path"]
 
@@ -60,10 +70,12 @@ def download_from_ms(**kwargs):
     elif os.path.exists(os.path.join(model_or_path, "config.yaml")):
         config = OmegaConf.load(os.path.join(model_or_path, "config.yaml"))
         kwargs = OmegaConf.merge(config, kwargs)
+        """
         init_param = os.path.join(model_or_path, "model.pt")
         if "init_param" not in kwargs or not os.path.exists(kwargs["init_param"]):
             kwargs["init_param"] = init_param
             assert os.path.exists(kwargs["init_param"]), "init_param does not exist"
+        """
         if os.path.exists(os.path.join(model_or_path, "tokens.txt")):
             kwargs["tokenizer_conf"]["token_list"] = os.path.join(model_or_path, "tokens.txt")
         if os.path.exists(os.path.join(model_or_path, "tokens.json")):
