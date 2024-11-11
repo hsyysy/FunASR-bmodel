@@ -146,5 +146,5 @@ class CAMPPlus(torch.nn.Module):
         time3 = time.perf_counter()
         meta_data["extract_feat"] = f"{time3 - time2:0.3f}"
         meta_data["batch_data_time"] = np.array(speech_times).sum().item() / 16000.0
-        results = [{"spk_embedding": torch.from_numpy(self.bmodel([speech.to(torch.float32).numpy()])[0])}]
+        results = [{"spk_embedding": torch.from_numpy(self.bmodel([speech.to(torch.float32).cpu().numpy()])[0])}]
         return results, meta_data
