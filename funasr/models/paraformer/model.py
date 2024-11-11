@@ -7,7 +7,7 @@ import time
 import copy
 import torch
 import logging
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 from typing import Union, Dict, List, Tuple, Optional
 
 from funasr.register import tables
@@ -248,7 +248,7 @@ class Paraformer(torch.nn.Module):
                 speech_lengths: (Batch, )
                 ind: int
         """
-        with autocast(False):
+        with autocast("cuda",enabled=False):
 
             # Data augmentation
             if self.specaug is not None and self.training:

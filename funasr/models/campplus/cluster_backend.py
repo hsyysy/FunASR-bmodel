@@ -88,7 +88,7 @@ class SpectralCluster:
         return emb, num_of_spk
 
     def cluster_embs(self, emb, k):
-        _, labels, _ = k_means(emb, k)
+        _, labels, _ = k_means(emb, k, n_init=10)
         return labels
 
     def getEigenGaps(self, eig_vals):

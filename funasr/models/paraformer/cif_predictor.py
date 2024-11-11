@@ -10,7 +10,7 @@ import numpy as np
 from funasr.register import tables
 from funasr.train_utils.device_funcs import to_device
 from funasr.models.transformer.utils.nets_utils import make_pad_mask
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 
 
 @tables.register("predictor_classes", "CifPredictor")
@@ -47,7 +47,7 @@ class CifPredictor(torch.nn.Module):
         target_label_length=None,
     ):
 
-        with autocast(False):
+        with autocast("cuda",enabled=False):
             h = hidden
             context = h.transpose(1, 2)
             queries = self.pad(context)
@@ -209,7 +209,7 @@ class CifPredictorV2(torch.nn.Module):
         target_label_length=None,
     ):
 
-        with autocast(False):
+        with autocast("cuda",enabled=False):
             h = hidden
             context = h.transpose(1, 2)
             queries = self.pad(context)

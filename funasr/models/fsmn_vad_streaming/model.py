@@ -14,6 +14,7 @@ from enum import Enum
 from dataclasses import dataclass
 from funasr.register import tables
 from typing import List, Tuple, Dict, Any, Optional
+from funasr.utils.run_bmodel import EngineOV
 
 from funasr.utils.datadir_writer import DatadirWriter
 from funasr.utils.load_utils import load_audio_text_image_video, extract_fbank
@@ -299,6 +300,7 @@ class FsmnVADStreaming(nn.Module):
         encoder = encoder_class(**encoder_conf)
         self.encoder = encoder
         self.encoder_conf = encoder_conf
+        self.fsmn_model = EngineOV("./bmodel/fsmn/fsmn_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
 
     def ResetDetection(self, cache: dict = {}):
         cache["stats"].continous_silence_frame_count = 0
@@ -348,7 +350,26 @@ class FsmnVADStreaming(nn.Module):
 
 
     def ComputeScores(self, feats: torch.Tensor, cache: dict = {}) -> None:
-        scores = self.encoder(feats, cache=cache["encoder"]).to("cpu")  # return B * T * D
+        #scores = self.encoder(feats, cache=cache["encoder"]).to("cpu")  # return B * T * D
+        cache_frames = self.encoder_conf.get("lorder") + self.encoder_conf.get("rorder") - 1
+        speech = feats.detach().numpy()
+        if cache["encoder"].get("cache_layer_0") is None:
+            in_cache0 = torch.zeros(1, self.encoder_conf.get("proj_dim"), cache_frames, 1).detach().numpy()
+            in_cache1 = torch.zeros(1, self.encoder_conf.get("proj_dim"), cache_frames, 1).detach().numpy()
+            in_cache2 = torch.zeros(1, self.encoder_conf.get("proj_dim"), cache_frames, 1).detach().numpy()
+            in_cache3 = torch.zeros(1, self.encoder_conf.get("proj_dim"), cache_frames, 1).detach().numpy()
+        else:
+            in_cache0 = cache["encoder"]["cache_layer_0"].detach().numpy()
+            in_cache1 = cache["encoder"]["cache_layer_1"].detach().numpy()
+            in_cache2 = cache["encoder"]["cache_layer_2"].detach().numpy()
+            in_cache3 = cache["encoder"]["cache_layer_3"].detach().numpy()
+        #run bmodel
+        output = self.fsmn_model([speech, in_cache0, in_cache1, in_cache2, in_cache3])
+        scores = torch.from_numpy(output[0])
+        cache["encoder"]["cache_layer_0"] = torch.from_numpy(output[1])
+        cache["encoder"]["cache_layer_1"] = torch.from_numpy(output[2])
+        cache["encoder"]["cache_layer_2"] = torch.from_numpy(output[3])
+        cache["encoder"]["cache_layer_3"] = torch.from_numpy(output[4])
         assert (
             scores.shape[1] == feats.shape[1]
         ), "The shape between feats and scores does not match"
