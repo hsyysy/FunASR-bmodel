@@ -6,7 +6,7 @@ import time
 print("importing AutoModel...")
 from funasr import AutoModel
 print("importing finished")
-dev_id = 5
+dev_id = 0
 print("loading model")
 print("-"*120)
 model_vad = AutoModel(model="bmodel/iic/speech_fsmn_vad_zh-cn-16k-common-pytorch", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
