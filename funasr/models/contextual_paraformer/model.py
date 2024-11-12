@@ -82,8 +82,8 @@ class ContextualParaformer(Paraformer):
             self.attn_loss = torch.nn.L1Loss()
         self.crit_attn_smooth = crit_attn_smooth
 
-        self.encoder_model = EngineOV("./bmodel/asr/encoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
-        self.decoder_model = EngineOV("./bmodel/asr/decoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        self.encoder_model = EngineOV(kwargs["model_path"]+"/encoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        self.decoder_model = EngineOV(kwargs["model_path"]+"/decoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
 
     def forward(
         self,
