@@ -24,6 +24,8 @@ from funasr.models.transformer.utils.add_sos_eos import add_sos_eos
 from funasr.models.transformer.utils.nets_utils import make_pad_mask, pad_list
 from funasr.utils.load_utils import load_audio_text_image_video, extract_fbank
 
+from funasr.utils.run_bmodel import EngineOV
+import numpy as np
 
 if LooseVersion(torch.__version__) >= LooseVersion("1.6.0"):
     from torch.amp import autocast
@@ -65,6 +67,15 @@ class ParaformerStreaming(Paraformer):
                 build_scama_mask_for_cross_attention_decoder
             )
             self.decoder_attention_chunk_type = kwargs.get("decoder_attention_chunk_type", "chunk")
+
+        self.encoder_bmodel = EngineOV(kwargs["model_path"]+"/online_encoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        self.decoder0_bmodel = EngineOV(kwargs["model_path"]+"/online_decoder0_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        self.decoder1_bmodel = EngineOV(kwargs["model_path"]+"/online_decoder1_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+
+        self.predictor.cif_conv1d.weight = torch.load(kwargs["model_path"]+"/cif_conv1d_weight.pt")
+        self.predictor.cif_conv1d.bias = torch.load(kwargs["model_path"]+"/cif_conv1d_bias.pt")
+        self.predictor.cif_output.weight = torch.load(kwargs["model_path"]+"/cif_output_weight.pt")
+        self.predictor.cif_output.bias = torch.load(kwargs["model_path"]+"/cif_output_bias.pt")
 
     def forward(
         self,
@@ -479,11 +490,22 @@ class ParaformerStreaming(Paraformer):
         speech_lengths = speech_lengths.to(device=kwargs["device"])
 
         # Encoder
+        """
         encoder_out, encoder_out_lens = self.encode_chunk(
             speech, speech_lengths, cache=cache, is_final=kwargs.get("is_final", False)
         )
         if isinstance(encoder_out, tuple):
             encoder_out = encoder_out[0]
+        """
+        speech = speech.detach().numpy()
+        start_idx = (torch.tensor([0], dtype=torch.int64).detach().numpy()).astype(np.int32)
+        chunk_size = (torch.tensor(cache['encoder']['chunk_size'], dtype=torch.int64).detach().numpy()).astype(np.int32)
+        feats = cache['encoder']['feats'].detach().numpy()
+        outputs = self.encoder_bmodel([speech, start_idx, chunk_size, feats])
+        cache['encoder']['start_idx'] = torch.from_numpy(outputs[1])
+        cache['encoder']['feats'] = torch.from_numpy(outputs[2])
+        encoder_out = torch.from_numpy(outputs[0])
+        encoder_out_lens = torch.tensor([encoder_out.size(1)])
 
         # predictor
         predictor_outs = self.calc_predictor_chunk(
@@ -498,10 +520,28 @@ class ParaformerStreaming(Paraformer):
         pre_token_length = pre_token_length.round().long()
         if torch.max(pre_token_length) < 1:
             return []
+        """
         decoder_outs = self.cal_decoder_with_predictor_chunk(
             encoder_out, encoder_out_lens, pre_acoustic_embeds, pre_token_length, cache=cache
         )
         decoder_out, ys_pad_lens = decoder_outs[0], decoder_outs[1]
+        """
+        encoder_out = encoder_out.detach().numpy()
+        pre_acoustic_embeds = pre_acoustic_embeds.detach().numpy()
+        lens = (pre_token_length.detach().numpy()).astype(np.int32)
+        input = [encoder_out, pre_acoustic_embeds]
+        if cache['decoder']['decode_fsmn'] is None:
+            outputs = self.decoder0_bmodel(input)
+        else:
+            input.append(lens)
+            for i in range(16):
+                input.append(cache['decoder']['decode_fsmn'][i].detach().numpy())
+            outputs = self.decoder1_bmodel(input)
+        decode_fsmn = []
+        for i in range(16):
+            decode_fsmn.append(torch.from_numpy(outputs[i+1]))
+        cache['decoder']['decode_fsmn'] = decode_fsmn
+        decoder_out = torch.from_numpy(outputs[0])
 
         results = []
         b, n, d = decoder_out.size()
