@@ -430,8 +430,8 @@ class AutoModel:
             if len(sorted_data) > 0 and len(sorted_data[0]) > 0:
                 batch_size = max(batch_size, sorted_data[0][0][1] - sorted_data[0][0][0])
 
-            if kwargs["device"] == "cpu":
-                batch_size = 0
+            #if kwargs["device"] == "cpu":
+                #batch_size = 0
 
             beg_idx = 0
             beg_asr_total = time.time()
