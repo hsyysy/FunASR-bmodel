@@ -33,6 +33,8 @@ def download_from_ms(**kwargs):
     model_revision = kwargs.get("model_revision", "master")
     if kwargs["model"] == "iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch":
         model_or_path = "./bmodel/asr_seaco"
+    elif kwargs["model"] == "iic/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404":
+        model_or_path = "./bmodel/asr"
     elif kwargs["model"] == "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch":
         model_or_path = "./bmodel/fsmn"
     elif kwargs["model"] == "iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch":

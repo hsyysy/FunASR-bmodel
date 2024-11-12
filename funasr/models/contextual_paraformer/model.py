@@ -26,6 +26,8 @@ from funasr.train_utils.device_funcs import force_gatherable
 from funasr.models.transformer.utils.add_sos_eos import add_sos_eos
 from funasr.models.transformer.utils.nets_utils import make_pad_mask, pad_list
 from funasr.utils.load_utils import load_audio_text_image_video, extract_fbank
+from funasr.utils.run_bmodel import EngineOV
+from funasr.models.paraformer.cif_predictor import cif
 
 
 if LooseVersion(torch.__version__) >= LooseVersion("1.6.0"):
@@ -79,6 +81,9 @@ class ContextualParaformer(Paraformer):
         if self.crit_attn_weight > 0:
             self.attn_loss = torch.nn.L1Loss()
         self.crit_attn_smooth = crit_attn_smooth
+
+        self.encoder_model = EngineOV("./bmodel/asr/encoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        self.decoder_model = EngineOV("./bmodel/asr/decoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
 
     def forward(
         self,
@@ -390,6 +395,7 @@ class ContextualParaformer(Paraformer):
             kwargs.get("hotword", None), tokenizer=tokenizer, frontend=frontend
         )
 
+        """
         # Encoder
         encoder_out, encoder_out_lens = self.encode(speech, speech_lengths)
         if isinstance(encoder_out, tuple):
@@ -416,6 +422,46 @@ class ContextualParaformer(Paraformer):
             clas_scale=kwargs.get("clas_scale", 1.0),
         )
         decoder_out, ys_pad_lens = decoder_outs[0], decoder_outs[1]
+        """
+        speech = speech.detach().cpu().numpy()
+        speech_lengths = speech_lengths.detach().cpu().numpy()
+        encoder_output = self.encoder_model([speech, speech_lengths])
+        enc, hidden, alphas, token_num = torch.from_numpy(encoder_output[0]), torch.from_numpy(encoder_output[1]), torch.from_numpy(encoder_output[2]), torch.from_numpy(encoder_output[3])
+        if isinstance(enc, tuple):
+            enc = enc[0]
+
+        acoustic_embeds, cif_peak = cif(hidden, alphas, 1.0)
+        token_num_int = torch.max(token_num).type(torch.int32).item()
+        acoustic_embeds = acoustic_embeds[:, :token_num_int, :]
+        token_num = token_num.round().long()
+        if torch.max(token_num) < 1:
+            return []
+        encoder_out = enc
+        hw_list=self.hotword_list
+        if hw_list is None:
+            hw_list = [torch.Tensor([1]).long().to(encoder_out.device)]  # empty hotword list
+            hw_list_pad = pad_list(hw_list, 0)
+            if self.use_decoder_embedding:
+                hw_embed = self.decoder.embed(hw_list_pad)
+            else:
+                hw_embed = self.bias_embed(hw_list_pad)
+            hw_embed, (h_n, _) = self.bias_encoder(hw_embed)
+            hw_embed = h_n.repeat(encoder_out.shape[0], 1, 1)
+        else:
+            hw_lengths = [len(i) for i in hw_list]
+            hw_list_pad = pad_list([torch.Tensor(i).long() for i in hw_list], 0).to(encoder_out.device)
+            if self.use_decoder_embedding:
+                hw_embed = self.decoder.embed(hw_list_pad)
+            else:
+                hw_embed = self.bias_embed(hw_list_pad)
+            hw_embed = torch.nn.utils.rnn.pack_padded_sequence(hw_embed, hw_lengths, batch_first=True,
+                                                               enforce_sorted=False)
+            _, (h_n, _) = self.bias_encoder(hw_embed)
+            hw_embed = h_n.repeat(encoder_out.shape[0], 1, 1)
+        decoder_output = self.decoder_model([enc.detach().numpy(), speech_lengths, acoustic_embeds.detach().numpy(), token_num.detach().numpy().astype(np.int32), hw_embed.detach().numpy()])
+        decoder_out = torch.from_numpy(decoder_output[0])
+        pre_token_length = token_num
+        encoder_out_lens = torch.from_numpy(speech_lengths)
 
         results = []
         b, n, d = decoder_out.size()
