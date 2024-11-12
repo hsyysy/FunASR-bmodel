@@ -3,7 +3,7 @@ import time
 import multiprocessing 
 
 # setting
-dev_id = 5                              ## bm1684x/bm1688 device id
+dev_id = 0                              ## bm1684x/bm1688 device id
 #input_path = "./audio/20240711090630019.wav" # "./chuanda.wav" # "./vad_example.wav" #        ## input audio path
 input_path = "./audio/vad_example.wav" # "./chuanda.wav" # "./vad_example.wav" #        ## input audio path
 
