@@ -391,9 +391,12 @@ class ContextualParaformer(Paraformer):
         speech_lengths = speech_lengths.to(device=kwargs["device"])
 
         # hotword
+        """
         self.hotword_list = self.generate_hotwords_list(
             kwargs.get("hotword", None), tokenizer=tokenizer, frontend=frontend
         )
+        """
+        self.hotword_list = None
 
         """
         # Encoder
