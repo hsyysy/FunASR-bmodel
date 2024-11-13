@@ -433,15 +433,14 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         # predictor
         predictor_outs = self.calc_predictor(encoder_out, encoder_out_lens)
         pre_acoustic_embeds, pre_token_length = predictor_outs[0], predictor_outs[1]
-        pre_token_length = pre_token_length.round().long()
-        if torch.max(pre_token_length) < 1:
-            return ([],)
         """
         hidden, alphas, pre_token_length = torch.from_numpy(outputs[1]), torch.from_numpy(outputs[2]), torch.from_numpy(outputs[3])
         pre_acoustic_embeds, pre_peak_index = cif(hidden, alphas, 1.0)
         token_num_int = torch.max(pre_token_length).type(torch.int32).item()
         pre_acoustic_embeds = pre_acoustic_embeds[:, :token_num_int, :]
         pre_token_length = pre_token_length.round().long()
+        if torch.max(pre_token_length) < 1:
+            return ([],)
 
         decoder_out = self._seaco_decode_with_ASF(
             encoder_out,
@@ -455,9 +454,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         if self.predictor_name == "CifPredictorV3":
             outputs = self.predictor_bmodel([encoder_out.detach().cpu().numpy(), encoder_out_lens.detach().cpu().numpy().astype(np.int32)])
             alphas2 = torch.from_numpy(outputs[0])
-            _token_num = torch.from_numpy(outputs[1])
-            token_num = pre_token_length
-            us_alphas = alphas2 * ((token_num / _token_num)[:, None].repeat(1, alphas2.size(1)))
+            us_alphas = alphas2 * ((pre_token_length / torch.from_numpy(outputs[1]))[:, None].repeat(1, alphas2.size(1)))
             us_peaks = cif_wo_hidden(us_alphas, 1.0 - 1e-4)
             """
             _, _, us_alphas, us_peaks = self.calc_predictor_timestamp(
