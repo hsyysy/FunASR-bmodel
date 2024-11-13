@@ -335,6 +335,7 @@ class ContextualParaformer(Paraformer):
             _, (h_n, _) = self.bias_encoder(hw_embed)
             hw_embed = h_n.repeat(encoder_out.shape[0], 1, 1)
 
+        """
         decoder_outs = self.decoder(
             encoder_out,
             encoder_out_lens,
@@ -343,8 +344,17 @@ class ContextualParaformer(Paraformer):
             contextual_info=hw_embed,
             clas_scale=clas_scale,
         )
+        """
+        decoder_outs = self.decoder_model([
+            encoder_out.detach().numpy(),
+            encoder_out_lens.detach().numpy(),
+            sematic_embeds.detach().numpy(),
+            ys_pad_lens.detach().numpy().astype(np.int32),
+            hw_embed.detach().numpy()
+        ])
 
         decoder_out = decoder_outs[0]
+        decoder_out = torch.from_numpy(decoder_out)
         decoder_out = torch.log_softmax(decoder_out, dim=-1)
         return decoder_out, ys_pad_lens
 
@@ -400,13 +410,20 @@ class ContextualParaformer(Paraformer):
         """
         self.hotword_list = None
 
-        """
         # Encoder
+        """
         encoder_out, encoder_out_lens = self.encode(speech, speech_lengths)
+        """
+        speech = speech.detach().cpu().numpy()
+        speech_lengths = speech_lengths.detach().cpu().numpy()
+        encoder_output = self.encoder_model([speech, speech_lengths])
+        encoder_out, hidden, alphas, pre_token_length = torch.from_numpy(encoder_output[0]), torch.from_numpy(encoder_output[1]), torch.from_numpy(encoder_output[2]), torch.from_numpy(encoder_output[3])
+        encoder_out_lens = torch.from_numpy(speech_lengths)
         if isinstance(encoder_out, tuple):
             encoder_out = encoder_out[0]
 
         # predictor
+        """
         predictor_outs = self.calc_predictor(encoder_out, encoder_out_lens)
         pre_acoustic_embeds, pre_token_length, alphas, pre_peak_index = (
             predictor_outs[0],
@@ -414,6 +431,10 @@ class ContextualParaformer(Paraformer):
             predictor_outs[2],
             predictor_outs[3],
         )
+        """
+        pre_acoustic_embeds, cif_peak = cif(hidden, alphas, 1.0)
+        token_num_int = torch.max(pre_token_length).type(torch.int32).item()
+        pre_acoustic_embeds = pre_acoustic_embeds[:, :token_num_int, :]
         pre_token_length = pre_token_length.round().long()
         if torch.max(pre_token_length) < 1:
             return []
@@ -427,46 +448,6 @@ class ContextualParaformer(Paraformer):
             clas_scale=kwargs.get("clas_scale", 1.0),
         )
         decoder_out, ys_pad_lens = decoder_outs[0], decoder_outs[1]
-        """
-        speech = speech.detach().cpu().numpy()
-        speech_lengths = speech_lengths.detach().cpu().numpy()
-        encoder_output = self.encoder_model([speech, speech_lengths])
-        enc, hidden, alphas, token_num = torch.from_numpy(encoder_output[0]), torch.from_numpy(encoder_output[1]), torch.from_numpy(encoder_output[2]), torch.from_numpy(encoder_output[3])
-        if isinstance(enc, tuple):
-            enc = enc[0]
-
-        acoustic_embeds, cif_peak = cif(hidden, alphas, 1.0)
-        token_num_int = torch.max(token_num).type(torch.int32).item()
-        acoustic_embeds = acoustic_embeds[:, :token_num_int, :]
-        token_num = token_num.round().long()
-        if torch.max(token_num) < 1:
-            return []
-        encoder_out = enc
-        hw_list=self.hotword_list
-        if hw_list is None:
-            hw_list = [torch.Tensor([1]).long().to(encoder_out.device)]  # empty hotword list
-            hw_list_pad = pad_list(hw_list, 0)
-            if self.use_decoder_embedding:
-                hw_embed = self.decoder.embed(hw_list_pad)
-            else:
-                hw_embed = self.bias_embed(hw_list_pad)
-            hw_embed, (h_n, _) = self.bias_encoder(hw_embed)
-            hw_embed = h_n.repeat(encoder_out.shape[0], 1, 1)
-        else:
-            hw_lengths = [len(i) for i in hw_list]
-            hw_list_pad = pad_list([torch.Tensor(i).long() for i in hw_list], 0).to(encoder_out.device)
-            if self.use_decoder_embedding:
-                hw_embed = self.decoder.embed(hw_list_pad)
-            else:
-                hw_embed = self.bias_embed(hw_list_pad)
-            hw_embed = torch.nn.utils.rnn.pack_padded_sequence(hw_embed, hw_lengths, batch_first=True,
-                                                               enforce_sorted=False)
-            _, (h_n, _) = self.bias_encoder(hw_embed)
-            hw_embed = h_n.repeat(encoder_out.shape[0], 1, 1)
-        decoder_output = self.decoder_model([enc.detach().numpy(), speech_lengths, acoustic_embeds.detach().numpy(), token_num.detach().numpy().astype(np.int32), hw_embed.detach().numpy()])
-        decoder_out = torch.from_numpy(decoder_output[0])
-        pre_token_length = token_num
-        encoder_out_lens = torch.from_numpy(speech_lengths)
 
         results = []
         b, n, d = decoder_out.size()
