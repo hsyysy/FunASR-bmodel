@@ -73,9 +73,9 @@ class ParaformerStreaming(Paraformer):
         self.decoder1_bmodel = EngineOV(kwargs["model_path"]+"/online_decoder1_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
 
         self.predictor.cif_conv1d.weight = torch.load(kwargs["model_path"]+"/cif_conv1d_weight.pt",weights_only=True)
-        self.predictor.cif_conv1d.bias = torch.load(kwargs["model_path"]+"/cif_conv1d_bias.pt",weights_only=True)
+        self.predictor.cif_conv1d.bias   = torch.load(kwargs["model_path"]+"/cif_conv1d_bias.pt",weights_only=True)
         self.predictor.cif_output.weight = torch.load(kwargs["model_path"]+"/cif_output_weight.pt",weights_only=True)
-        self.predictor.cif_output.bias = torch.load(kwargs["model_path"]+"/cif_output_bias.pt",weights_only=True)
+        self.predictor.cif_output.bias   = torch.load(kwargs["model_path"]+"/cif_output_bias.pt",weights_only=True)
 
     def forward(
         self,
