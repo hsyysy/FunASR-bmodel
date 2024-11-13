@@ -88,11 +88,15 @@ class CTTransformer(torch.nn.Module):
             input (torch.Tensor): Input ids. (batch, len)
             hidden (torch.Tensor): Target ids. (batch, len)
 
-        """
         x = self.embed(text)
         # mask = self._target_mask(input)
         h, _, _ = self.encoder(x, text_lengths)
         y = self.decoder(h)
+        """
+        inputs = text.type(torch.int32).detach().numpy()
+        text_lengths = text_lengths.type(torch.int32).detach().numpy()
+        output = self.punc_model([inputs, text_lengths])
+        y = torch.from_numpy(output[0])
         return y, None
 
     def with_vad(self):
@@ -288,11 +292,11 @@ class CTTransformer(torch.nn.Module):
             }
             data = to_device(data, kwargs["device"])
             # y, _ = self.wrapped_model(**data)
-            #y, _ = self.punc_forward(**data)
-            inputs = data["text"].type(torch.int32).detach().numpy()
-            text_lengths = data['text_lengths'].type(torch.int32).detach().numpy()
-            output = self.punc_model([inputs, text_lengths])
-            y = torch.from_numpy(output[0])
+            y, _ = self.punc_forward(**data)
+            #inputs = data["text"].type(torch.int32).detach().numpy()
+            #text_lengths = data['text_lengths'].type(torch.int32).detach().numpy()
+            #output = self.punc_model([inputs, text_lengths])
+            #y = torch.from_numpy(output[0])
             _, indices = y.view(-1, y.shape[-1]).topk(1, dim=1)
             punctuations = torch.squeeze(indices, dim=1)
             assert punctuations.size()[0] == len(mini_sentence)
