@@ -9,8 +9,6 @@ import argparse
 import ssl
 import base64
 
-import sys
-sys.path.append("../../..")
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

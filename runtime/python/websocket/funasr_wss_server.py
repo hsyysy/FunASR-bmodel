@@ -8,9 +8,6 @@ import numpy as np
 import argparse
 import ssl
 
-import sys
-sys.path.append("../../..")
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -20,34 +17,33 @@ parser.add_argument("--port", type=int, default=10095, required=False, help="grp
 parser.add_argument(
     "--asr_model",
     type=str,
-    default="../../../bmodel/iic/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404",
+    default="iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
     help="model from modelscope",
 )
 parser.add_argument("--asr_model_revision", type=str, default="v2.0.4", help="")
 parser.add_argument(
     "--asr_model_online",
     type=str,
-    default="../../../bmodel/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online",
+    default="iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online",
     help="model from modelscope",
 )
 parser.add_argument("--asr_model_online_revision", type=str, default="v2.0.4", help="")
 parser.add_argument(
     "--vad_model",
     type=str,
-    default="../../../bmodel/iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
+    default="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
     help="model from modelscope",
 )
 parser.add_argument("--vad_model_revision", type=str, default="v2.0.4", help="")
 parser.add_argument(
     "--punc_model",
     type=str,
-    default="../../../bmodel/iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch",
+    default="iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727",
     help="model from modelscope",
 )
 parser.add_argument("--punc_model_revision", type=str, default="v2.0.4", help="")
 parser.add_argument("--ngpu", type=int, default=1, help="0 for cpu, 1 for gpu")
 parser.add_argument("--device", type=str, default="cuda", help="cuda, cpu")
-parser.add_argument("--dev_id", type=int, default=0, help="tpu id")
 parser.add_argument("--ncpu", type=int, default=4, help="cpu cores")
 parser.add_argument(
     "--certfile",
@@ -79,8 +75,6 @@ model_asr = AutoModel(
     ngpu=args.ngpu,
     ncpu=args.ncpu,
     device=args.device,
-    dev_id=args.dev_id,
-    disable_update=True,
     disable_pbar=True,
     disable_log=True,
 )
@@ -91,8 +85,6 @@ model_asr_streaming = AutoModel(
     ngpu=args.ngpu,
     ncpu=args.ncpu,
     device=args.device,
-    dev_id=args.dev_id,
-    disable_update=True,
     disable_pbar=True,
     disable_log=True,
 )
@@ -103,8 +95,6 @@ model_vad = AutoModel(
     ngpu=args.ngpu,
     ncpu=args.ncpu,
     device=args.device,
-    dev_id=args.dev_id,
-    disable_update=True,
     disable_pbar=True,
     disable_log=True,
     # chunk_size=60,
@@ -117,8 +107,6 @@ if args.punc_model != "":
         ngpu=args.ngpu,
         ncpu=args.ncpu,
         device=args.device,
-        dev_id=args.dev_id,
-        disable_update=True,
         disable_pbar=True,
         disable_log=True,
     )
