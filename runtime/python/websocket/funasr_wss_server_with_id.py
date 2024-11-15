@@ -18,28 +18,28 @@ parser.add_argument("--port", type=int, default=10095, required=False, help="grp
 parser.add_argument(
     "--asr_model",
     type=str,
-    default="../../../bmodel/iic/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404",
+    default="iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
     help="model from modelscope",
 )
 parser.add_argument("--asr_model_revision", type=str, default="v2.0.4", help="")
 parser.add_argument(
     "--asr_model_online",
     type=str,
-    default="../../../bmodel/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online",
+    default="iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online",
     help="model from modelscope",
 )
 parser.add_argument("--asr_model_online_revision", type=str, default="v2.0.4", help="")
 parser.add_argument(
     "--vad_model",
     type=str,
-    default="../../../bmodel/iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
+    default="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
     help="model from modelscope",
 )
 parser.add_argument("--vad_model_revision", type=str, default="v2.0.4", help="")
 parser.add_argument(
     "--punc_model",
     type=str,
-    default="../../../bmodel/iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch",
+    default="iic/punc_ct-transformer_zh-cn-common-vad_realtime-vocab272727",
     help="model from modelscope",
 )
 parser.add_argument("--punc_model_revision", type=str, default="v2.0.4", help="")
