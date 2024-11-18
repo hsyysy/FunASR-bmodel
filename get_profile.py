@@ -1,5 +1,11 @@
 import numpy as np
 
+def safe_str_to_float(s):
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
 with open("log.txt","r") as f:
     lines = f.readlines()
 
@@ -40,10 +46,14 @@ pnum = {}
 for pstr0 in pstr:
     ptime[pstr0] = 0
     pnum[pstr0] = 0
-for a in lines:
+for idx,a in enumerate(lines):
     for pstr0 in pstr:
         if a.startswith(pstr0):
-            ptime[pstr0] += float(a.split(' ')[-1])
+            num = safe_str_to_float(a.split(' ')[-1])
+            if num:
+                ptime[pstr0] += num
+            else:
+                print(format(idx,'5d')+': '+a,end="")
             pnum[pstr0] += 1
 
 for pstr0 in pstr:
