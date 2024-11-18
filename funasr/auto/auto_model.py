@@ -465,8 +465,6 @@ class AutoModel:
                 speech_j, speech_lengths_j = slice_padding_audio_samples(
                     speech, speech_lengths, sorted_data[beg_idx:end_idx]
                 )
-                print("asr slice time:",time.time()-st)
-                st = time.time()
                 results = self.inference(
                     speech_j, input_len=None, model=model, kwargs=kwargs, **cfg
                 )

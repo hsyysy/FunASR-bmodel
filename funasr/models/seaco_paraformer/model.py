@@ -394,9 +394,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
             self.init_beam_search(**kwargs)
             self.nbest = kwargs.get("nbest", 1)
         meta_data = {}
-        print("asr inner init beamsearch time:",time.time()-st)
 
-        st = time.time()
         # extract fbank feats
         time1 = time.perf_counter()
         audio_sample_list = load_audio_text_image_video(

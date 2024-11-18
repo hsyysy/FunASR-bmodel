@@ -593,7 +593,6 @@ class FsmnVADStreaming(nn.Module):
         else:
             self.DetectLastFrames(cache=cache)
         print("vad inner forward DetectFrames time:",time.time()-st)
-        st = time.time()
         segments = []
         for batch_num in range(0, feats.shape[0]):  # only support batch_size = 1 now
             segment_batch = []
@@ -645,7 +644,6 @@ class FsmnVADStreaming(nn.Module):
         # if is_final:
         #     # reset class variables and clear the dict for the next query
         #     self.AllResetDetection()
-        print("vad inner forward post time:",time.time()-st)
         return segments
 
     def init_cache(self, cache: dict = {}, **kwargs):
@@ -760,7 +758,6 @@ class FsmnVADStreaming(nn.Module):
                 segments.extend(*segments_i)
             print("vad inner forward total time:",time.time()-st)
 
-        st = time.time()
         cache["prev_samples"] = audio_sample[:-m]
         if _is_final:
             self.init_cache(cache)
@@ -781,7 +778,6 @@ class FsmnVADStreaming(nn.Module):
         if ibest_writer is not None:
             ibest_writer["text"][key[0]] = segments
 
-        print("vad inner post time:",time.time()-st)
         return results, meta_data
 
     def export(self, **kwargs):
