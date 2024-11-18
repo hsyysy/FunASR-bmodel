@@ -52,4 +52,4 @@ for idx,a in enumerate(lines):
             pnum[pstr0] += 1
 
 for pstr0 in pstr:
-    print(pstr0.ljust(strlen+1),':',format(ptime[pstr0],'6.2f')+", N =",format(pnum[pstr0],'4d'))
+    print(pstr0.ljust(strlen+1),':',format(ptime[pstr0],'7.2f')+", N =",format(pnum[pstr0],'4d'))
