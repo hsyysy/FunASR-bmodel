@@ -8,6 +8,7 @@ import scipy
 import torch
 import sklearn
 import numpy as np
+import time
 
 from sklearn.cluster._kmeans import k_means
 from sklearn.cluster import HDBSCAN
@@ -116,19 +117,25 @@ class UmapHdbscan:
         self.metric = metric
 
     def __call__(self, X):
+        st = time.time()
         import umap.umap_ as umap
+        print("clustering import time:",time.time()-st)
 
+        st = time.time()
         umap_X = umap.UMAP(
             n_neighbors=self.n_neighbors,
             min_dist=0.0,
             n_components=min(self.n_components, X.shape[0] - 2),
             metric=self.metric,
         ).fit_transform(X)
+        print("clustering umap time:",time.time()-st)
+        st = time.time()
         labels = HDBSCAN(
             min_samples=self.min_samples,
             min_cluster_size=self.min_cluster_size,
             allow_single_cluster=True,
         ).fit_predict(umap_X)
+        print("clustering HDBSCAN time:",time.time()-st)
         return labels
 
 

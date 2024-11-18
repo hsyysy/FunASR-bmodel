@@ -383,6 +383,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         **kwargs,
     ):
 
+        st = time.time()
         # init beamsearch
         is_use_ctc = kwargs.get("decoding_ctc_weight", 0.0) > 0.00001 and self.ctc != None
         is_use_lm = (
@@ -393,7 +394,9 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
             self.init_beam_search(**kwargs)
             self.nbest = kwargs.get("nbest", 1)
         meta_data = {}
+        print("asr init beamsearch time:",time.time()-st)
 
+        st = time.time()
         # extract fbank feats
         time1 = time.perf_counter()
         audio_sample_list = load_audio_text_image_video(
@@ -412,6 +415,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
 
         speech = speech.to(device=kwargs["device"])
         speech_lengths = speech_lengths.to(device=kwargs["device"])
+        print("asr extract fbank feats time:",time.time()-st)
 
         # hotword
         """
@@ -421,6 +425,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         """
         self.hotword_list = None
 
+        st = time.time()
         # Encoder
         #encoder_out, encoder_out_lens = self.encode(speech, speech_lengths)
         outputs = self.encoder_bmodel([speech.detach().cpu().numpy(), speech_lengths.detach().cpu().numpy()])
@@ -449,7 +454,9 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
             pre_token_length,
             hw_list=self.hotword_list,
         )
+        print("asr encode time:",time.time()-st)
 
+        st = time.time()
         # decoder_out, _ = decoder_outs[0], decoder_outs[1]
         if self.predictor_name == "CifPredictorV3":
             outputs = self.predictor_bmodel([encoder_out.detach().cpu().numpy(), encoder_out_lens.detach().cpu().numpy().astype(np.int32)])
@@ -464,6 +471,8 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         else:
             us_alphas = None
 
+        print("asr predict time:",time.time()-st)
+        st = time.time()
         results = []
         b, n, d = decoder_out.size()
         for i in range(b):
@@ -540,6 +549,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
                     result_i = {"key": key[i], "token_int": token_int}
                 results.append(result_i)
 
+        print("asr inner post time:",time.time()-st)
         return results, meta_data
 
     def generate_hotwords_list(self, hotword_list_or_file, tokenizer=None, frontend=None):
