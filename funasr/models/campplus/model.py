@@ -130,6 +130,7 @@ class CAMPPlus(torch.nn.Module):
         **kwargs,
     ):
         # extract fbank feats
+        st = time.time()
         meta_data = {}
         time1 = time.perf_counter()
         audio_sample_list = load_audio_text_image_video(
@@ -142,5 +143,8 @@ class CAMPPlus(torch.nn.Module):
         time3 = time.perf_counter()
         meta_data["extract_feat"] = f"{time3 - time2:0.3f}"
         meta_data["batch_data_time"] = np.array(speech_times).sum().item() / 16000.0
+        print("spk extract fbank feats time:",time.time()-st)
+        st = time.time()
         results = [{"spk_embedding": self.forward(speech.to(torch.float32))}]
+        print("spk forward time:",time.time()-st)
         return results, meta_data

@@ -368,6 +368,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         **kwargs,
     ):
 
+        st = time.time()
         # init beamsearch
         is_use_ctc = kwargs.get("decoding_ctc_weight", 0.0) > 0.00001 and self.ctc != None
         is_use_lm = (
@@ -397,17 +398,21 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
 
         speech = speech.to(device=kwargs["device"])
         speech_lengths = speech_lengths.to(device=kwargs["device"])
+        print("asr inner extract fbank feats time:",time.time()-st)
 
         # hotword
         self.hotword_list = self.generate_hotwords_list(
             kwargs.get("hotword", None), tokenizer=tokenizer, frontend=frontend
         )
 
+        st = time.time()
         # Encoder
         encoder_out, encoder_out_lens = self.encode(speech, speech_lengths)
         if isinstance(encoder_out, tuple):
             encoder_out = encoder_out[0]
+        print("asr inner encode time:",time.time()-st)
 
+        st = time.time()
         # predictor
         predictor_outs = self.calc_predictor(encoder_out, encoder_out_lens)
         pre_acoustic_embeds, pre_token_length = predictor_outs[0], predictor_outs[1]
@@ -430,7 +435,9 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
             )
         else:
             us_alphas = None
+        print("asr inner predict time:",time.time()-st)
 
+        st = time.time()
         results = []
         b, n, d = decoder_out.size()
         for i in range(b):
@@ -507,6 +514,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
                     result_i = {"key": key[i], "token_int": token_int}
                 results.append(result_i)
 
+        print("asr inner post time:",time.time()-st)
         return results, meta_data
 
     def generate_hotwords_list(self, hotword_list_or_file, tokenizer=None, frontend=None):

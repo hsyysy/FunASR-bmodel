@@ -378,6 +378,7 @@ class AutoModel:
             input, input_len=input_len, model=self.vad_model, kwargs=self.vad_kwargs, **cfg
         )
         end_vad = time.time()
+        print("vad total time:",end_vad-beg_vad)
 
         #  FIX(gcf): concat the vad clips for sense vocie model for better aed
         if cfg.get("merge_vad", False):
@@ -406,6 +407,7 @@ class AutoModel:
             else None
         )
         for i in range(len(res)):
+            st = time.time()
             key = res[i]["key"]
             vadsegments = res[i]["value"]
             input_i = data_list[i]
@@ -438,7 +440,9 @@ class AutoModel:
             all_segments = []
             max_len_in_batch = 0
             end_idx = 1
+            print("asr load files time:",time.time()-st)
             for j, _ in enumerate(range(0, n)):
+                st = time.time()
                 # pbar_sample.update(1)
                 sample_length = sorted_data[j][0][1] - sorted_data[j][0][0]
                 potential_batch_length = max(max_len_in_batch, sample_length) * (j + 1 - beg_idx)
@@ -458,6 +462,8 @@ class AutoModel:
                 results = self.inference(
                     speech_j, input_len=None, model=model, kwargs=kwargs, **cfg
                 )
+                print("asr inference time:",time.time()-st)
+                st = time.time()
                 if self.spk_model is not None:
                     # compose vad segments: [[start_time_sec, end_time_sec, speech], [...]]
                     for _b in range(len(speech_j)):
@@ -481,6 +487,7 @@ class AutoModel:
                 if len(results) < 1:
                     continue
                 results_sorted.extend(results)
+                print("spk embedding time",time.time()-st)
 
             # end_asr_total = time.time()
             # time_escape_total_per_sample = end_asr_total - beg_asr_total
@@ -489,6 +496,7 @@ class AutoModel:
             #                      f"time_speech_total_per_sample: {time_speech_total_per_sample: 0.3f}, "
             #                      f"time_escape_total_per_sample: {time_escape_total_per_sample:0.3f}")
 
+            st = time.time()
             if len(results_sorted) != n:
                 results_ret_list.append({"key": key, "text": "", "timestamp": []})
                 logging.info("decoding, utt: {}, empty result".format(key))
@@ -529,6 +537,8 @@ class AutoModel:
             if not len(result["text"].strip()):
                 continue
             return_raw_text = kwargs.get("return_raw_text", False)
+            print("asr and spk post time:",time.time()-st)
+            st = time.time()
             # step.3 compute punc model
             raw_text = None
             if self.punc_model is not None:
@@ -540,9 +550,12 @@ class AutoModel:
                 if return_raw_text:
                     result["raw_text"] = raw_text
                 result["text"] = punc_res[0]["text"]
+            print("punc time:",time.time()-st)
 
+            st = time.time()
             # speaker embedding cluster after resorted
             if self.spk_model is not None and kwargs.get("return_spk_res", True):
+                cb_st = time.time()
                 if raw_text is None:
                     logging.error("Missing punc_model, which is required by spk_model.")
                 all_segments = sorted(all_segments, key=lambda x: x[0])
@@ -550,6 +563,8 @@ class AutoModel:
                 labels = self.cb_model(
                     spk_embedding.cpu(), oracle_num=kwargs.get("preset_spk_num", None)
                 )
+                print("clustering cb_model time:",time.time()-cb_st)
+                cb_st = time.time()
                 # del result['spk_embedding']
                 sv_output = postprocess(all_segments, None, labels, spk_embedding.cpu())
                 if self.spk_mode == "vad_segment":  # recover sentence_list
@@ -592,6 +607,7 @@ class AutoModel:
                         )
                 distribute_spk(sentence_list, sv_output)
                 result["sentence_info"] = sentence_list
+                print("clustering post time:",time.time()-cb_st)
             elif kwargs.get("sentence_timestamp", False):
                 if not len(result["text"].strip()):
                     sentence_list = []
@@ -631,6 +647,7 @@ class AutoModel:
         # print(f"rtf_avg_all: {time_escape_total_all_samples / time_speech_total_all_samples:0.3f}, "
         #                      f"time_speech_all: {time_speech_total_all_samples: 0.3f}, "
         #                      f"time_escape_all: {time_escape_total_all_samples:0.3f}")
+            print("clustering total time:",time.time()-st)
         return results_ret_list
 
     def export(self, input=None, **cfg):

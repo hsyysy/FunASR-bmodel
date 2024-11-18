@@ -553,17 +553,23 @@ class FsmnVADStreaming(nn.Module):
         is_final: bool = False,
         **kwargs,
     ):
+        st = time.time()
         # if len(cache) == 0:
         #     self.AllResetDetection()
         # self.waveform = waveform  # compute decibel for each frame
         cache["stats"].waveform = waveform
         is_streaming_input = kwargs.get("is_streaming_input", True)
         self.ComputeDecibel(cache=cache)
+        print("vad inner forward ComputeDecibel time:",time.time()-st)
+        st = time.time()
         self.ComputeScores(feats, cache=cache)
+        print("vad inner forward ComputeScores time:",time.time()-st)
+        st = time.time()
         if not is_final:
             self.DetectCommonFrames(cache=cache)
         else:
             self.DetectLastFrames(cache=cache)
+        print("vad inner forward DetectFrames time:",time.time()-st)
         segments = []
         for batch_num in range(0, feats.shape[0]):  # only support batch_size = 1 now
             segment_batch = []
@@ -656,6 +662,7 @@ class FsmnVADStreaming(nn.Module):
         **kwargs,
     ):
 
+        st = time.time()
         if len(cache) == 0:
             self.init_cache(cache, **kwargs)
 
@@ -691,8 +698,10 @@ class FsmnVADStreaming(nn.Module):
 
         n = int(len(audio_sample) // chunk_stride_samples + int(_is_final))
         m = int(len(audio_sample) % chunk_stride_samples * (1 - int(_is_final)))
+        print("vad inner prepare time:",time.time()-st)
         segments = []
         for i in range(n):
+            st = time.time()
             kwargs["is_final"] = _is_final and i == n - 1
             audio_sample_i = audio_sample[i * chunk_stride_samples : (i + 1) * chunk_stride_samples]
 
@@ -719,9 +728,12 @@ class FsmnVADStreaming(nn.Module):
                 "cache": cache,
                 "is_streaming_input": is_streaming_input,
             }
+            print("vad inner fbank time:",time.time()-st)
+            st = time.time()
             segments_i = self.forward(**batch)
             if len(segments_i) > 0:
                 segments.extend(*segments_i)
+            print("vad inner forward total time:",time.time()-st)
 
         cache["prev_samples"] = audio_sample[:-m]
         if _is_final:
