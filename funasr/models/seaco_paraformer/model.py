@@ -394,7 +394,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
             self.init_beam_search(**kwargs)
             self.nbest = kwargs.get("nbest", 1)
         meta_data = {}
-        print("asr init beamsearch time:",time.time()-st)
+        print("asr inner init beamsearch time:",time.time()-st)
 
         st = time.time()
         # extract fbank feats
@@ -415,7 +415,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
 
         speech = speech.to(device=kwargs["device"])
         speech_lengths = speech_lengths.to(device=kwargs["device"])
-        print("asr extract fbank feats time:",time.time()-st)
+        print("asr inner extract fbank feats time:",time.time()-st)
 
         # hotword
         """
@@ -454,7 +454,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
             pre_token_length,
             hw_list=self.hotword_list,
         )
-        print("asr encode time:",time.time()-st)
+        print("asr inner encode time:",time.time()-st)
 
         st = time.time()
         # decoder_out, _ = decoder_outs[0], decoder_outs[1]
@@ -471,7 +471,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         else:
             us_alphas = None
 
-        print("asr predict time:",time.time()-st)
+        print("asr inner predict time:",time.time()-st)
         st = time.time()
         results = []
         b, n, d = decoder_out.size()

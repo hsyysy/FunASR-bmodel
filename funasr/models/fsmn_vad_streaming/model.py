@@ -583,16 +583,16 @@ class FsmnVADStreaming(nn.Module):
         cache["stats"].waveform = waveform
         is_streaming_input = kwargs.get("is_streaming_input", True)
         self.ComputeDecibel(cache=cache)
-        print("vad forward ComputeDecibel time:",time.time()-st)
+        print("vad inner forward ComputeDecibel time:",time.time()-st)
         st = time.time()
         self.ComputeScores(feats, cache=cache)
-        print("vad forward ComputeScores time:",time.time()-st)
+        print("vad inner forward ComputeScores time:",time.time()-st)
         st = time.time()
         if not is_final:
             self.DetectCommonFrames(cache=cache)
         else:
             self.DetectLastFrames(cache=cache)
-        print("vad forward DetectFrames time:",time.time()-st)
+        print("vad inner forward DetectFrames time:",time.time()-st)
         st = time.time()
         segments = []
         for batch_num in range(0, feats.shape[0]):  # only support batch_size = 1 now
@@ -645,7 +645,7 @@ class FsmnVADStreaming(nn.Module):
         # if is_final:
         #     # reset class variables and clear the dict for the next query
         #     self.AllResetDetection()
-        print("vad forward post time:",time.time()-st)
+        print("vad inner forward post time:",time.time()-st)
         return segments
 
     def init_cache(self, cache: dict = {}, **kwargs):
@@ -723,7 +723,7 @@ class FsmnVADStreaming(nn.Module):
 
         n = int(len(audio_sample) // chunk_stride_samples + int(_is_final))
         m = int(len(audio_sample) % chunk_stride_samples * (1 - int(_is_final)))
-        print("vad prepare time:",time.time()-st)
+        print("vad inner prepare time:",time.time()-st)
         segments = []
         for i in range(n):
             st = time.time()
@@ -753,12 +753,12 @@ class FsmnVADStreaming(nn.Module):
                 "cache": cache,
                 "is_streaming_input": is_streaming_input,
             }
-            print("vad fbank time:",time.time()-st)
+            print("vad inner fbank time:",time.time()-st)
             st = time.time()
             segments_i = self.forward(**batch)
             if len(segments_i) > 0:
                 segments.extend(*segments_i)
-            print("vad forward time:",time.time()-st)
+            print("vad inner forward total time:",time.time()-st)
 
         st = time.time()
         cache["prev_samples"] = audio_sample[:-m]
@@ -781,7 +781,7 @@ class FsmnVADStreaming(nn.Module):
         if ibest_writer is not None:
             ibest_writer["text"][key[0]] = segments
 
-        print("vad post time:",time.time()-st)
+        print("vad inner post time:",time.time()-st)
         return results, meta_data
 
     def export(self, **kwargs):

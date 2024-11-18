@@ -393,7 +393,6 @@ class AutoModel:
                 )
 
         # step.2 compute asr model
-        st = time.time()
         model = self.model
         deep_update(kwargs, cfg)
         batch_size = max(int(kwargs.get("batch_size_s", 300)) * 1000, 1)
@@ -412,7 +411,6 @@ class AutoModel:
             if not kwargs.get("disable_pbar", False)
             else None
         )
-        print("data prepare time:",time.time()-st)
         for i in range(len(res)):
             st = time.time()
             key = res[i]["key"]
@@ -447,7 +445,7 @@ class AutoModel:
             all_segments = []
             max_len_in_batch = 0
             end_idx = 1
-            print("speech prepare time:",time.time()-st)
+            print("asr load files time:",time.time()-st)
             for j, _ in enumerate(range(0, n)):
                 st = time.time()
                 # pbar_sample.update(1)
@@ -467,7 +465,7 @@ class AutoModel:
                 speech_j, speech_lengths_j = slice_padding_audio_samples(
                     speech, speech_lengths, sorted_data[beg_idx:end_idx]
                 )
-                print("asr loading file time:",time.time()-st)
+                print("asr slice time:",time.time()-st)
                 st = time.time()
                 results = self.inference(
                     speech_j, input_len=None, model=model, kwargs=kwargs, **cfg

@@ -119,7 +119,7 @@ class UmapHdbscan:
     def __call__(self, X):
         st = time.time()
         import umap.umap_ as umap
-        print("clustering import time:",time.time()-st)
+        print("clustering inner import time:",time.time()-st)
 
         st = time.time()
         umap_X = umap.UMAP(
@@ -128,14 +128,14 @@ class UmapHdbscan:
             n_components=min(self.n_components, X.shape[0] - 2),
             metric=self.metric,
         ).fit_transform(X)
-        print("clustering umap time:",time.time()-st)
+        print("clustering inner umap time:",time.time()-st)
         st = time.time()
         labels = HDBSCAN(
             min_samples=self.min_samples,
             min_cluster_size=self.min_cluster_size,
             allow_single_cluster=True,
         ).fit_predict(umap_X)
-        print("clustering HDBSCAN time:",time.time()-st)
+        print("clustering inner HDBSCAN time:",time.time()-st)
         return labels
 
 
