@@ -10,11 +10,11 @@ input_path = "./audio/vad_example.wav" # "./chuanda.wav" # "./vad_example.wav" #
 def process():
     # offline asr demo
     model = AutoModel(
-            #model="bmodel/iic/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404",         ## 语音识别模型
-            model="bmodel/iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",      ## 语音识别模型
-            vad_model="bmodel/iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",                                  ## 语音端点检测模型
-            punc_model="bmodel/iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch",                     ## 标点恢复模型
-            spk_model="bmodel/iic/speech_campplus_sv_zh-cn_16k-common",                                       ## 说话人识别模型
+            #model="bmodel/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404",         ## 语音识别模型
+            model="bmodel/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",      ## 语音识别模型
+            vad_model="bmodel/speech_fsmn_vad_zh-cn-16k-common-pytorch",                                  ## 语音端点检测模型
+            punc_model="bmodel/punc_ct-transformer_zh-cn-common-vocab272727-pytorch",                     ## 标点恢复模型
+            spk_model="bmodel/speech_campplus_sv_zh-cn_16k-common",                                       ## 说话人识别模型
             device="cpu",
             disable_update=True,
             disable_pbar=True,
