@@ -29,6 +29,6 @@ for item in recv:
         online_time.append(proc_time)
     alltime.append(proc_time)
 
-print("online  time avg: "+str(np.mean(online_time))+", std = "+str(np.std(online_time)))
-print("offline time avg: "+str(np.mean(offline_time))+", std = "+str(np.std(offline_time)))
-print("allline time avg: "+str(np.mean(alltime))+", std = "+str(np.std(alltime)))
+print("online  time avg: "+format(np.mean(online_time),'6.3f')+", std = "+format(np.std(online_time),'6.3f'))
+print("offline time avg: "+format(np.mean(offline_time),'6.3f')+", std = "+format(np.std(offline_time),'6.3f'))
+print("allline time avg: "+format(np.mean(alltime),'6.3f')+", std = "+format(np.std(alltime),'6.3f'))
