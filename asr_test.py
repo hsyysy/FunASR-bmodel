@@ -2,20 +2,23 @@ import numpy as np
 import torch
 import time
 
+from process_0_info import get_file_dev_id
+
+file_path, dev_id = get_file_dev_id()
+
 # load model
 print("importing AutoModel...")
 from funasr import AutoModel
 print("importing finished")
-dev_id = 0
 print("loading model")
 print("-"*120)
-model_vad = AutoModel(model="bmodel/iic/speech_fsmn_vad_zh-cn-16k-common-pytorch", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
+model_vad = AutoModel(model="bmodel/speech_fsmn_vad_zh-cn-16k-common-pytorch", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
 print("-"*120)
-model_asr = AutoModel(model="bmodel/iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
+model_asr = AutoModel(model="bmodel/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
 print("-"*120)
-model_spk = AutoModel(model="bmodel/iic/speech_campplus_sv_zh-cn_16k-common", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
+model_spk = AutoModel(model="bmodel/speech_campplus_sv_zh-cn_16k-common", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
 print("-"*120)
-model_punc = AutoModel(model="bmodel/iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
+model_punc = AutoModel(model="bmodel/punc_ct-transformer_zh-cn-common-vocab272727-pytorch", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
 print("-"*120)
 print("model loaded")
 print()
@@ -24,8 +27,7 @@ all_st = time.time()
 # step.0 load audio
 st = time.time()
 import wave
-with wave.open("./audio/vad_example.wav", "rb") as wav_file:
-#with wave.open("./audio/20240711090630019.wav", "rb") as wav_file:
+with wave.open(file_path, "rb") as wav_file:
     params = wav_file.getparams()
     fs = wav_file.getframerate()
     frames = wav_file.readframes(wav_file.getnframes())
