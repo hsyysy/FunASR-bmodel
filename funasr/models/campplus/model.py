@@ -149,7 +149,7 @@ class CAMPPlus(torch.nn.Module):
         meta_data["batch_data_time"] = np.array(speech_times).sum().item() / 16000.0
         print("spk extract fbank feats time:",time.time()-st)
         st = time.time()
-        output = np.zeros([speech.shape[0],192])
+        output = np.zeros([speech.shape[0],192],dtype='float32')
         for ii in range(len(speech)):
             output[ii] = self.bmodel([speech[ii].to(torch.float32).cpu().numpy()])[0]
         results = [{"spk_embedding": torch.from_numpy(output)}]
