@@ -1,6 +1,6 @@
 export PYTHONPATH=$PWD:$PYTHONPATH
 
-modeldir="../../../bmodel/iic"
+modeldir="../../../bmodel"
 
 asr_model="${modeldir}/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404"
 #asr_model="${modeldir}/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
