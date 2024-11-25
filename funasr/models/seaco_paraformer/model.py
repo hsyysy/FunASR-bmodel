@@ -107,11 +107,11 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         self.NO_BIAS = kwargs.get("NO_BIAS", 8377)
         self.predictor_name = kwargs.get("predictor")
 
-        #self.encoder_bmodel = EngineOV(kwargs["model_path"]+"/seaco_encoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
-        self.encoder_bmodel = EngineOV(kwargs["model_path"]+"/seaco_encoder2_bm1684x_f16_b10.bmodel", device_id=kwargs['dev_id'])
+        self.encoder_bmodel = EngineOV(kwargs["model_path"]+"/seaco_encoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        #self.encoder_bmodel = EngineOV(kwargs["model_path"]+"/seaco_encoder2_bm1684x_f16_b10.bmodel", device_id=kwargs['dev_id'])
 
-        #self.predictor_bmodel = EngineOV(kwargs["model_path"]+"/seaco_predictor_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
-        self.predictor_bmodel = EngineOV(kwargs["model_path"]+"/seaco_predictor_bm1684x_f16_b10.bmodel", device_id=kwargs['dev_id'])
+        self.predictor_bmodel = EngineOV(kwargs["model_path"]+"/seaco_predictor_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        #self.predictor_bmodel = EngineOV(kwargs["model_path"]+"/seaco_predictor_bm1684x_f16_b10.bmodel", device_id=kwargs['dev_id'])
 
         self.decoder_bmodel = EngineOV(kwargs["model_path"]+"/seaco_decoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
 
