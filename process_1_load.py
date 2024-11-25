@@ -7,7 +7,7 @@ import wave
 
 from process_0_info import get_file_dev_id
 
-file_path, dev_id = get_file_dev_id()
+file_path, _, _= get_file_dev_id()
 filename = os.path.splitext(file_path)[0]
 
 st = time.time()

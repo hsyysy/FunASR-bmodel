@@ -8,12 +8,10 @@ from funasr.utils.vad_utils import slice_padding_audio_samples
 
 from process_0_info import get_file_dev_id
 
-file_path, dev_id = get_file_dev_id()
+file_path, dev_id, model_dir = get_file_dev_id()
 
 filename = os.path.splitext(file_path)[0]
 
-dev_id = 5
-model_dir = "./bmodel/"
 model_asr = AutoModel(model=model_dir+"speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
 #model_asr = AutoModel(model=model_dir+"speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404",device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
 
