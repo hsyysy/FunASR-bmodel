@@ -6,8 +6,10 @@ import pickle
 from funasr import AutoModel
 from funasr.utils.vad_utils import slice_padding_audio_samples
 
-file_path = "./audio/vad_example.wav"
-#file_path = "./audio/20240711090630019.wav"
+from process_0_info import get_file_dev_id
+
+file_path, dev_id = get_file_dev_id()
+
 filename = os.path.splitext(file_path)[0]
 
 dev_id = 5

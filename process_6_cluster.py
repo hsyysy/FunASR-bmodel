@@ -8,8 +8,10 @@ from funasr.utils.timestamp_tools import timestamp_sentence
 from funasr.models.campplus.cluster_backend import ClusterBackend
 from funasr.models.campplus.utils import postprocess, distribute_spk
 
-file_path = "./audio/vad_example.wav"
-#file_path = "./audio/20240711090630019.wav"
+from process_0_info import get_file_dev_id
+
+file_path, dev_id = get_file_dev_id()
+
 filename = os.path.splitext(file_path)[0]
 
 with open(filename+'_punc.pkl', 'rb') as f:

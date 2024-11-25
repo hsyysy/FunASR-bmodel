@@ -2,10 +2,9 @@ from funasr import AutoModel
 import time
 import multiprocessing 
 
-# setting
-dev_id = 0                              ## bm1684x/bm1688 device id
-#input_path = "./audio/20240711090630019.wav" # "./chuanda.wav" # "./vad_example.wav" #        ## input audio path
-input_path = "./audio/vad_example.wav" # "./chuanda.wav" # "./vad_example.wav" #        ## input audio path
+from process_0_info import get_file_dev_id
+
+file_path, dev_id = get_file_dev_id()
 
 def process():
     # offline asr demo
@@ -22,7 +21,7 @@ def process():
     )
     # inference
     start_time = time.time()
-    res = model.generate(input=input_path, batch_size_s=300,)
+    res = model.generate(input=file_path, batch_size_s=300,)
     end_time = time.time()
     #print(res[0]["text"])
     for si in res[0]["sentence_info"]:
