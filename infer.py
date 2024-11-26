@@ -23,9 +23,11 @@ def process():
     start_time = time.time()
     res = model.generate(input=file_path, batch_size_s=300,)
     end_time = time.time()
-    #print(res[0]["text"])
-    for si in res[0]["sentence_info"]:
-        print("["+format(si["start"],"7d")+"]["+format(si["end"],"7d")+"], spk="+format(si["spk"],'2d')+", text: "+si["text"])
+    if "sentence_info" in res[0].keys():
+        for si in res[0]["sentence_info"]:
+            print("["+format(si["start"],"7d")+"]["+format(si["end"],"7d")+"], spk="+format(si["spk"],'2d')+", text: "+si["text"])
+    else:
+        print(res[0]["text"])
     print("generate time:", end_time-start_time)
 
 """
