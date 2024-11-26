@@ -301,8 +301,8 @@ class FsmnVADStreaming(nn.Module):
         self.encoder = encoder
         self.encoder_conf = encoder_conf
 
-        #self.fsmn_model = EngineOV(kwargs["model_path"]+"/fsmn_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
-        self.fsmn_model = EngineOV(kwargs["model_path"]+"/fsmn_bm1684x_f16.bmodel", device_id=kwargs['dev_id'])
+        self.fsmn_model = EngineOV(kwargs["model_path"]+"/fsmn_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        #self.fsmn_model = EngineOV(kwargs["model_path"]+"/fsmn_bm1684x_f16.bmodel", device_id=kwargs['dev_id'])
 
     def ResetDetection(self, cache: dict = {}):
         cache["stats"].continous_silence_frame_count = 0
