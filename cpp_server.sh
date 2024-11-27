@@ -1,4 +1,3 @@
-## model from export.py
 model_dir=$HOME/funasr_onnx_model
 
 model=./bmodel/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404
@@ -9,10 +8,10 @@ vad_dir=./bmodel/speech_fsmn_vad_zh-cn-16k-common-pytorch
 
 punc_dir=./bmodel/punc_ct-transformer_zh-cn-common-vocab272727-pytorch
 
+#quantize=true
 quantize=false
 
-./runtime/onnxruntime/build/bin/funasr-onnx-2pass \
-    --mode 2pass \
+./runtime/websocket/build/bin/funasr-wss-server-2pass \
     --model-dir         ${model}    \
     --online-model-dir  ${online_model} \
     --vad-dir           ${vad_dir}  \
@@ -20,10 +19,9 @@ quantize=false
     --quantize          ${quantize} \
     --vad-quant         ${quantize} \
     --punc-quant        ${quantize} \
-    --lm-dir  $HOME/modelscope/speech_ngram_lm_zh-cn-ai-wesp-fst \
-    --itn-dir $HOME/modelscope/fst_itn_zh \
-    --wav-path ./audio/test_audio_20241017.wav
-
-    #--wav-path ./test_asr.wav
-    #--wav-path ./audio/test_audio_20241017.wav
-    #--wav-path ./audio/vad_example.wav
+    --lm-dir   $HOME/modelscope/speech_ngram_lm_zh-cn-ai-wesp-fst \
+    --itn-dir  $HOME/modelscope/fst_itn_zh \
+    --keyfile  ./runtime/ssl_key/server.key \
+    --certfile ./runtime/ssl_key/server.crt \
+    --hotword "" \
+    --port 10211

@@ -24,6 +24,11 @@ else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fPIC")
 endif()
 
+# for bmrt
+find_package(libsophon REQUIRED)
+include_directories(${LIBSOPHON_INCLUDE_DIRS})
+link_directories(${LIBSOPHON_LIB_DIRS})
+
 if(GPU)
     add_definitions(-DUSE_GPU)
     set(TORCH_DIR "/usr/local/lib/python3.8/dist-packages/torch")
