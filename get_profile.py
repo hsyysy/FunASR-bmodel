@@ -20,6 +20,7 @@ pstr = [
         "asr load files time",
         "asr inner extract fbank feats time",
         "asr inner encode time",
+        "asr inner decode time",
         "asr inner predict time",
         "asr inner post time",
         "asr inference time",

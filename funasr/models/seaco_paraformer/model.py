@@ -431,7 +431,9 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         encoder_out_lens = speech_lengths
         if isinstance(encoder_out, tuple):
             encoder_out = encoder_out[0]
+        print("asr inner encode time:",time.time()-st)
 
+        st = time.time()
         """
         # predictor
         predictor_outs = self.calc_predictor(encoder_out, encoder_out_lens)
@@ -452,7 +454,7 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
             pre_token_length,
             hw_list=self.hotword_list,
         )
-        print("asr inner encode time:",time.time()-st)
+        print("asr inner decode time:",time.time()-st)
 
         st = time.time()
         # decoder_out, _ = decoder_outs[0], decoder_outs[1]
