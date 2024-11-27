@@ -17,53 +17,6 @@ Paraformer::Paraformer()
  hw_env_(ORT_LOGGING_LEVEL_ERROR, "paraformer_hw"),hw_session_options{} {
 }
 
-std::string GetCurrentTimeAsFilename() {
-    // 获取当前时间点
-    auto now = std::chrono::system_clock::now();
-    auto time_t_now = std::chrono::system_clock::to_time_t(now);
-    auto ms_part = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-
-    // 转换为本地时间
-    std::tm tm_now;
-#ifdef _WIN32
-    localtime_s(&tm_now, &time_t_now); // Windows 平台
-#else
-    localtime_r(&time_t_now, &tm_now); // Linux/Unix 平台
-#endif
-
-    // 格式化时间
-    std::ostringstream oss;
-    oss << std::put_time(&tm_now, "%Y-%m-%d_%H-%M-%S"); // 格式化为 YYYY-MM-DD_HH-MM-SS
-    oss << "_" << std::setw(3) << std::setfill('0') << ms_part.count(); // 添加毫秒部分，固定 3 位
-    return oss.str();
-}
-
-void WriteFloatArrayToFileWithTimestamp(std::string dir, const float* data, size_t size) {
-    // 获取文件名
-    std::string filename = dir + "/" + GetCurrentTimeAsFilename() + ".bin";
-
-    // 打开文件
-    std::ofstream file(filename, std::ios::binary);
-    //std::ofstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << filename << std::endl;
-        return;
-    }
-
-    // 写入数据
-    file.write(reinterpret_cast<const char*>(data), size * sizeof(float));
-    /*
-    for (size_t i = 0; i < size; ++i) {
-        file << data[i] << "\n";
-    }
-    */
-
-    // 关闭文件
-    file.close();
-
-    std::cout << size << " data written to " << filename << std::endl;
-}
-
 // bmrt
 void Paraformer::InitBmrt(const char* en_model, const char* em_model, const char* ls_model, const char* de_model, int dev_id){
     status = bm_dev_request(&bm_handle, dev_id);
@@ -611,59 +564,6 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
     */
 
     try {
-        /*
-        for (int ii=0;ii<120;ii++) std::cout << "-";std::cout << std::endl;
-        std::ifstream file("whole_audio_pytorch_input/2024-11-21_16-13-08_387.bin", std::ios::binary);
-        if (!file) {
-            std::cerr << "Failed to open file." << std::endl;
-        }
-        // 获取文件大小
-        file.seekg(0, std::ios::end);
-        size_t fileSize = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        // 分配缓冲区并读取数据
-        size_t numElements = fileSize / sizeof(float);  // 计算元素个数
-        std::vector<float> data(numElements);          // 使用 vector 管理内存
-        file.read(reinterpret_cast<char*>(data.data()), fileSize);
-        file.close();
-
-        // 将 .bin 数据写入已有的输入张量
-        float* tensor_data_ptr = input_onnx[0].GetTensorMutableData<float>();
-        std::copy(data.begin(), data.end(), tensor_data_ptr);
-        */
-
-        /*
-        for (int ii=0;ii<m_szInputNames.size();ii++){
-            std::vector<int64_t> inputShape = input_onnx[ii].GetTensorTypeAndShapeInfo().GetShape();
-            int64_t inputCount = std::accumulate(inputShape.begin(), inputShape.end(), 1, std::multiplies<int64_t>());
-            ONNXTensorElementDataType inputType = input_onnx[ii].GetTensorTypeAndShapeInfo().GetElementType();
-            std::cout << "input [" << ii << "]: " << std::left << std::setw(16) << std::setfill(' ') \
-            << m_szInputNames[ii] << ", type = " << inputType << ", count = " \
-            << std::left << std::setw(10) << std::setfill(' ') << inputCount << ", shape = [ ";
-            for(int jj=0;jj<inputShape.size();jj++){
-                if (jj>0) std::cout << ", ";
-                std::cout << inputShape[jj];
-            }
-            std::cout << " ]" << std::endl;
-            if (ii==0){
-                float* indata = input_onnx[ii].GetTensorMutableData<float>();
-                std::cout << "First 10 : ";
-                for (int jj=0;jj<10;jj++)
-                    std::cout << indata[jj] << " ";
-                std::cout << std::endl;
-                std::cout << "Last  10 : ";
-                for (int jj=0;jj<10;jj++)
-                    std::cout << indata[inputCount-jj-1] << " ";
-                std::cout << std::endl;
-                float multicount = 0;
-                for (int jj=0;jj<inputCount;jj++)
-                    multicount += indata[jj];
-                std::cout << "Data sum = " << multicount << std::endl;
-                WriteFloatArrayToFileWithTimestamp("input_data",indata,inputCount);
-            }
-        }
-        */
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_encoder, net_names[0]);
@@ -700,39 +600,6 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         ret = bmrt_launch_tensor_ex(p_bmrt_offline_encoder, net_names[0], input_tensors_encoder, 2, output_tensors_encoder, 4, true, false);
         assert(true == ret);
         bm_thread_sync(bm_handle);
-
-        /*
-        auto outputTensor = m_session_->Run(Ort::RunOptions{nullptr}, m_szInputNames.data(), input_onnx.data(), input_onnx.size(), m_szOutputNames.data(), m_szOutputNames.size());
-        for (int ii=0;ii<m_szOutputNames.size();ii++){
-            std::vector<int64_t> outputShape2 = outputTensor[ii].GetTensorTypeAndShapeInfo().GetShape();
-            int64_t outputCount2 = std::accumulate(outputShape2.begin(), outputShape2.end(), 1, std::multiplies<int64_t>());
-            ONNXTensorElementDataType outputType = outputTensor[ii].GetTensorTypeAndShapeInfo().GetElementType();
-            std::cout << "output[" << ii << "]: " << std::left << std::setw(16) << std::setfill(' ') \
-            << m_szOutputNames[ii] << ", type = " << outputType << ", count = " \
-            << std::left << std::setw(10) << std::setfill(' ') << outputCount2 << ", shape = [ ";
-            for(int jj=0;jj<outputShape2.size();jj++) {
-                if (jj>0) std::cout << ", ";
-                std::cout << outputShape2[jj];
-            }
-            std::cout << " ]" << std::endl;
-            if (ii==0){
-                float *outdata = outputTensor[ii].GetTensorMutableData<float>();
-                std::cout << "First 10 : ";
-                for (int jj=0;jj<10;jj++)
-                    std::cout << outdata[jj] << " ";
-                std::cout << std::endl;
-                std::cout << "Last  10 : ";
-                for (int jj=0;jj<10;jj++)
-                    std::cout << outdata[outputCount2-jj-1] << " ";
-                std::cout << std::endl;
-                float multicount = 0;
-                for (int jj=0;jj<outputCount2;jj++)
-                    multicount += outdata[jj];
-                std::cout << "Data sum = " << multicount << std::endl;
-                WriteFloatArrayToFileWithTimestamp("output_data",outdata,outputCount2);
-            }
-        }
-        */
 
         // encoder_out
         auto encoder_out_size = bmrt_tensor_bytesize(&output_tensors_encoder[0]);
@@ -818,17 +685,6 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
             }
         }
 
-        /*
-        std::vector<std::vector<int>> hw_list = {{1}};
-        auto hw_list_pad = pad_list(hw_list,0);
-        int* value = new int[hw_list_pad.size()*hw_list_pad[0].size()];
-        k = 0;
-        for (int i=0;i<hw_list_pad.size();i++){
-            for (int j=0;j<hw_list_pad[i].size();j++){
-                value[k] = hw_list_pad[i][j];
-            }
-        }
-        */
         int32_t value = 1;
         bm_tensor_t input_tensors_embedding[1];
         bmrt_tensor(&input_tensors_embedding[0], p_bmrt_offline_embedding, BM_INT32, {2, {1, 1}});
@@ -905,19 +761,6 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         auto decoder_out_lens = decoder_out_shape.dims[1];
         auto decoder_out_vocab = decoder_out_shape.dims[2];
 
-        /*
-        std::cout << "decoder out shape = [" << decoder_out_shape.dims[0] << ", " << decoder_out_shape.dims[1] << ", " << decoder_out_shape.dims[2] << "]" << std::endl;
-
-        std::cout << "First 10 : ";
-        for (int jj=0;jj<10;jj++)
-            std::cout << decoder_out[jj] << " ";
-        std::cout << std::endl;
-        std::cout << "Last  10 : ";
-        for (int jj=0;jj<10;jj++)
-            std::cout << decoder_out[decoder_out_count-jj-1] << " ";
-        std::cout << std::endl;
-        */
-
         // free device memory
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
@@ -965,6 +808,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         for (int ii=0;ii<120;ii++) std::cout << "-";std::cout << std::endl;
 
         /*
+        auto outputTensor = m_session_->Run(Ort::RunOptions{nullptr}, m_szInputNames.data(), input_onnx.data(), input_onnx.size(), m_szOutputNames.data(), m_szOutputNames.size());
         std::vector<int64_t> outputShape = outputTensor[0].GetTensorTypeAndShapeInfo().GetShape();
         //LOG(INFO) << "paraformer out shape " << outputShape[0] << " " << outputShape[1] << " " << outputShape[2];
 
@@ -1005,7 +849,6 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
 			}
         }
         */
-        std::cout << result << std::endl;
     }
     catch (std::exception const &e)
     {
@@ -1094,23 +937,7 @@ std::vector<std::vector<float>> Paraformer::CompileHotwordEmbedding(std::string 
 
     std::vector<std::vector<float>> result;
     try {
-        for (int ii=0;ii<hw_m_szInputNames.size();ii++){
-            std::vector<int64_t> inputShape = input_onnx[ii].GetTensorTypeAndShapeInfo().GetShape();
-            ONNXTensorElementDataType inputType = input_onnx[ii].GetTensorTypeAndShapeInfo().GetElementType();
-            std::cout << "hw_input [" << ii << "]: " << hw_m_szInputNames[ii] << ", type = " << inputType << ", shape = [ ";
-            for(int jj=0;jj<inputShape.size();jj++)
-                std::cout << inputShape[jj] << ", ";
-            std::cout << " ]" << std::endl;
-        }
         auto outputTensor = hw_m_session->Run(Ort::RunOptions{nullptr}, hw_m_szInputNames.data(), input_onnx.data(), input_onnx.size(), hw_m_szOutputNames.data(), hw_m_szOutputNames.size());
-        for (int ii=0;ii<hw_m_szOutputNames.size();ii++){
-            std::vector<int64_t> outputShape2 = outputTensor[ii].GetTensorTypeAndShapeInfo().GetShape();
-            ONNXTensorElementDataType outputType = outputTensor[ii].GetTensorTypeAndShapeInfo().GetElementType();
-            std::cout << "hw_output[" << ii << "]: " << hw_m_szOutputNames[ii] << ", type = " << outputType << ", shape = [ ";
-            for(int jj=0;jj<outputShape2.size();jj++)
-                std::cout << outputShape2[jj] << ", ";
-            std::cout << " ]" << std::endl;
-        }
         std::vector<int64_t> outputShape = outputTensor[0].GetTensorTypeAndShapeInfo().GetShape();
 
         int64_t outputCount = std::accumulate(outputShape.begin(), outputShape.end(), 1, std::multiplies<int64_t>());
