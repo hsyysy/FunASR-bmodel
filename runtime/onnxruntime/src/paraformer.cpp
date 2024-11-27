@@ -22,25 +22,49 @@ void Paraformer::InitBmrt(const char* en_model, const char* em_model, const char
     status = bm_dev_request(&bm_handle, dev_id);
     assert(BM_SUCCESS == status);
 
-    p_bmrt_offline_encoder = bmrt_create(bm_handle);
-    assert(NULL != p_bmrt_offline_encoder);
-    ret = bmrt_load_bmodel(p_bmrt_offline_encoder, en_model);
-    assert(true == ret);
+    try {
+        p_bmrt_offline_encoder = bmrt_create(bm_handle);
+        assert(NULL != p_bmrt_offline_encoder);
+        ret = bmrt_load_bmodel(p_bmrt_offline_encoder, en_model);
+        assert(true == ret);
+        LOG(INFO) << "Successfully load encoder model from " << en_model;
+    } catch (std::exception const &e) {
+        LOG(ERROR) << "Error when load encoder bmodel: " << e.what();
+        exit(-1);
+    }
 
-    p_bmrt_offline_embedding = bmrt_create(bm_handle);
-    assert(NULL != p_bmrt_offline_embedding);
-    ret = bmrt_load_bmodel(p_bmrt_offline_embedding, em_model);
-    assert(true == ret);
+    try {
+        p_bmrt_offline_embedding = bmrt_create(bm_handle);
+        assert(NULL != p_bmrt_offline_embedding);
+        ret = bmrt_load_bmodel(p_bmrt_offline_embedding, em_model);
+        assert(true == ret);
+        LOG(INFO) << "Successfully load embedding model from " << em_model;
+    } catch (std::exception const &e) {
+        LOG(ERROR) << "Error when load embedding bmodel: " << e.what();
+        exit(-1);
+    }
 
-    p_bmrt_offline_lstm = bmrt_create(bm_handle);
-    assert(NULL != p_bmrt_offline_lstm);
-    ret = bmrt_load_bmodel(p_bmrt_offline_lstm, ls_model);
-    assert(true == ret);
+    try {
+        p_bmrt_offline_lstm = bmrt_create(bm_handle);
+        assert(NULL != p_bmrt_offline_lstm);
+        ret = bmrt_load_bmodel(p_bmrt_offline_lstm, ls_model);
+        assert(true == ret);
+        LOG(INFO) << "Successfully load lstm model from " << ls_model;
+    } catch (std::exception const &e) {
+        LOG(ERROR) << "Error when load lstm bmodel: " << e.what();
+        exit(-1);
+    }
 
-    p_bmrt_offline_decoder = bmrt_create(bm_handle);
-    assert(NULL != p_bmrt_offline_decoder);
-    ret = bmrt_load_bmodel(p_bmrt_offline_decoder, de_model);
-    assert(true == ret);
+    try {
+        p_bmrt_offline_decoder = bmrt_create(bm_handle);
+        assert(NULL != p_bmrt_offline_decoder);
+        ret = bmrt_load_bmodel(p_bmrt_offline_decoder, de_model);
+        assert(true == ret);
+        LOG(INFO) << "Successfully load decoder model from " << de_model;
+    } catch (std::exception const &e) {
+        LOG(ERROR) << "Error when load decoder bmodel: " << e.what();
+        exit(-1);
+    }
 }
 
 // offline
