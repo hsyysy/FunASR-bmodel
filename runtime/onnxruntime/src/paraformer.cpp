@@ -805,8 +805,6 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
             result = FinalizeDecode(wfst_decoder);
         }
 
-        for (int ii=0;ii<120;ii++) std::cout << "-";std::cout << std::endl;
-
         /*
         auto outputTensor = m_session_->Run(Ort::RunOptions{nullptr}, m_szInputNames.data(), input_onnx.data(), input_onnx.size(), m_szOutputNames.data(), m_szOutputNames.size());
         std::vector<int64_t> outputShape = outputTensor[0].GetTensorTypeAndShapeInfo().GetShape();
