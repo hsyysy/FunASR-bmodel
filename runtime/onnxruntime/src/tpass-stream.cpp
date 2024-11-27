@@ -9,7 +9,7 @@ TpassStream::TpassStream(std::map<std::string, std::string>& model_path, int thr
         string vad_cmvn_path;
         string vad_config_path;
     
-        vad_model_path = PathAppend(model_path.at(VAD_DIR), MODEL_NAME);
+        vad_model_path = PathAppend(model_path.at(VAD_DIR), VAD_MODEL_NAME);
         if(model_path.find(VAD_QUANT) != model_path.end() && model_path.at(VAD_QUANT) == "true"){
             vad_model_path = PathAppend(model_path.at(VAD_DIR), QUANT_MODEL_NAME);
         }
@@ -58,7 +58,7 @@ TpassStream::TpassStream(std::map<std::string, std::string>& model_path, int thr
           asr_handle->InitSegDict(seg_dict_path);
         }
 
-        am_model_path = PathAppend(model_path.at(OFFLINE_MODEL_DIR), MODEL_NAME);
+        am_model_path = PathAppend(model_path.at(OFFLINE_MODEL_DIR), ENCODER_MODEL_NAME);
         en_model_path = PathAppend(model_path.at(ONLINE_MODEL_DIR), ENCODER_NAME);
         de_model_path = PathAppend(model_path.at(ONLINE_MODEL_DIR), DECODER_NAME);
         online_token_path = PathAppend(model_path.at(ONLINE_MODEL_DIR), TOKEN_PATH);
@@ -97,7 +97,7 @@ TpassStream::TpassStream(std::map<std::string, std::string>& model_path, int thr
         string punc_config_path;
         string token_path;
     
-        punc_model_path = PathAppend(model_path.at(PUNC_DIR), MODEL_NAME);
+        punc_model_path = PathAppend(model_path.at(PUNC_DIR), PUNC_MODEL_NAME);
         if(model_path.find(PUNC_QUANT) != model_path.end() && model_path.at(PUNC_QUANT) == "true"){
             punc_model_path = PathAppend(model_path.at(PUNC_DIR), QUANT_MODEL_NAME);
         }

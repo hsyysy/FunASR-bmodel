@@ -39,7 +39,8 @@ using namespace std;
 #include "kaldi/decoder/lattice-faster-online-decoder.h"
 // mine
 #include <glog/logging.h>
-
+// bmrt
+#include "bmruntime_interface.h"
 
 #include "common-struct.h"
 #include "com-define.h"

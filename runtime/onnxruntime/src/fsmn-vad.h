@@ -50,9 +50,17 @@ public:
     int lfr_m = VAD_LFR_M;
     int lfr_n = VAD_LFR_N;
 
+    // bmrt
+    bm_handle_t bm_handle;
+    bm_status_t status;
+    bool ret;
+    void* p_bmrt;
+    const bm_net_info_t *net_info;
+    const char **net_names;
+
 private:
 
-    void ReadModel(const char* vad_model);
+    void ReadModel(const char* vad_model, int dev_id);
     void LoadConfigFromYaml(const char* filename);
 
     void FbankKaldi(float sample_rate, std::vector<std::vector<float>> &vad_feats,

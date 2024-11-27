@@ -12,7 +12,7 @@ void FsmnVad::InitVad(const std::string &vad_model, const std::string &vad_cmvn,
     session_options_.SetGraphOptimizationLevel(ORT_ENABLE_ALL);
     session_options_.DisableCpuMemArena();
 
-    ReadModel(vad_model.c_str());
+    ReadModel(vad_model.c_str(), DEV_ID);
     LoadCmvn(vad_cmvn.c_str());
     LoadConfigFromYaml(vad_config.c_str());
     InitCache();
@@ -51,17 +51,30 @@ void FsmnVad::LoadConfigFromYaml(const char* filename){
     }
 }
 
-void FsmnVad::ReadModel(const char* vad_model) {
+void FsmnVad::ReadModel(const char* vad_model, int dev_id) {
     try {
-        vad_session_ = std::make_shared<Ort::Session>(
-                env_, ORTCHAR(vad_model), session_options_);
+        //vad_session_ = std::make_shared<Ort::Session>(
+                //env_, ORTCHAR(vad_model), session_options_);
+        status = bm_dev_request(&bm_handle, dev_id);
+        assert(BM_SUCCESS == status);
+
+        p_bmrt = bmrt_create(bm_handle);
+        assert(NULL != p_bmrt);
+        ret = bmrt_load_bmodel(p_bmrt, vad_model);
+        assert(true == ret);
+
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt, &net_names);
+        net_info = bmrt_get_network_info(p_bmrt, net_names[0]);
+        assert(NULL != net_info);
         LOG(INFO) << "Successfully load model from " << vad_model;
     } catch (std::exception const &e) {
-        LOG(ERROR) << "Error when load vad onnx model: " << e.what();
+        //LOG(ERROR) << "Error when load vad onnx model: " << e.what();
+        LOG(ERROR) << "Error when load vad bmodel: " << e.what();
         exit(-1);
     }
-    GetInputNames(vad_session_.get(), m_strInputNames, vad_in_names_);
-    GetOutputNames(vad_session_.get(), m_strOutputNames, vad_out_names_);
+    //GetInputNames(vad_session_.get(), m_strInputNames, vad_in_names_);
+    //GetOutputNames(vad_session_.get(), m_strOutputNames, vad_out_names_);
 }
 
 void FsmnVad::Forward(
@@ -69,8 +82,8 @@ void FsmnVad::Forward(
         std::vector<std::vector<float>> *out_prob,
         std::vector<std::vector<float>> *in_cache,
         bool is_final) {
-    Ort::MemoryInfo memory_info =
-            Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
+    //Ort::MemoryInfo memory_info =
+            //Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
 
     int num_frames = chunk_feats.size();
     const int feature_dim = chunk_feats[0].size();
@@ -82,6 +95,7 @@ void FsmnVad::Forward(
     for (const auto &chunk_feat: chunk_feats) {
         vad_feats.insert(vad_feats.end(), chunk_feat.begin(), chunk_feat.end());
     }
+    /*
     Ort::Value vad_feats_ort = Ort::Value::CreateTensor<float>(
             memory_info, vad_feats.data(), vad_feats.size(), vad_feats_shape, 3);
     
@@ -95,24 +109,57 @@ void FsmnVad::Forward(
       vad_inputs.emplace_back(std::move(Ort::Value::CreateTensor<float>(
               memory_info, (*in_cache)[i].data(), (*in_cache)[i].size(), cache_feats_shape, 4)));
     }
-  
+    */
+
+    // input tensor of vad
+    bm_tensor_t input_tensors_vad[5];
+    bmrt_tensor(&input_tensors_vad[0], p_bmrt, BM_FLOAT32, {3, {1, num_frames, feature_dim}});
+    status = bm_memcpy_s2d_partial(bm_handle, input_tensors_vad[0].device_mem, vad_feats.data(), vad_feats.size()*sizeof(float));
+    assert(BM_SUCCESS == status);
+
+    for (int i=0;i<4;i++){
+        bmrt_tensor(&input_tensors_vad[i+1], p_bmrt, BM_FLOAT32, {4, {1, 128, 19, 1}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_vad[i+1].device_mem, (*in_cache)[i].data(), (*in_cache)[i].size()*sizeof(float));
+    }
+    // output tensor of vad
+    bm_tensor_t output_tensors_vad[5];
+    for (int i=0;i<5;i++) {
+        status = bm_malloc_device_byte(bm_handle, &output_tensors_vad[i].device_mem, net_info->max_output_bytes[i]);
+        assert(BM_SUCCESS == status);
+    }
+
     // 4. Onnx infer
-    std::vector<Ort::Value> vad_ort_outputs;
+    //std::vector<Ort::Value> vad_ort_outputs;
     try {
+        // forward
+        ret = bmrt_launch_tensor_ex(p_bmrt, net_names[0], input_tensors_vad, 5, output_tensors_vad, 5, true, false);
+        assert(true == ret);
+        bm_thread_sync(bm_handle);
+        /*
         vad_ort_outputs = vad_session_->Run(
                 Ort::RunOptions{nullptr}, vad_in_names_.data(), vad_inputs.data(),
                 vad_inputs.size(), vad_out_names_.data(), vad_out_names_.size());
+        */
     } catch (std::exception const &e) {
         LOG(ERROR) << "Error when run vad onnx forword: " << (e.what());
         return;
     }
+    // bmrt
+    auto vad_out_size = bmrt_tensor_bytesize(&output_tensors_vad[0]);
+    auto vad_out_shape = output_tensors_vad[0].shape;
+    int num_outputs = vad_out_shape.dims[1];
+    int output_dim = vad_out_shape.dims[2];
+    auto vad_out_count = bmrt_shape_count(&vad_out_shape);
+    float* logp_data = new float[vad_out_count];
+    status = bm_memcpy_d2s_partial(bm_handle, logp_data, output_tensors_vad[0].device_mem, vad_out_size);
+    assert(BM_SUCCESS == status);
 
     // 5. Change infer result to output shapes
-    float *logp_data = vad_ort_outputs[0].GetTensorMutableData<float>();
-    auto type_info = vad_ort_outputs[0].GetTensorTypeAndShapeInfo();
+    //float *logp_data = vad_ort_outputs[0].GetTensorMutableData<float>();
+    //auto type_info = vad_ort_outputs[0].GetTensorTypeAndShapeInfo();
 
-    int num_outputs = type_info.GetShape()[1];
-    int output_dim = type_info.GetShape()[2];
+    //int num_outputs = type_info.GetShape()[1];
+    //int output_dim = type_info.GetShape()[2];
     out_prob->resize(num_outputs);
     for (int i = 0; i < num_outputs; i++) {
         (*out_prob)[i].resize(output_dim);
@@ -123,9 +170,21 @@ void FsmnVad::Forward(
     // get 4 caches outputs,each size is 128*19
     if(!is_final){
         for (int i = 1; i < 5; i++) {
-        float* data = vad_ort_outputs[i].GetTensorMutableData<float>();
+        //float* data = vad_ort_outputs[i].GetTensorMutableData<float>();
+        auto cache_out_size = bmrt_tensor_bytesize(&output_tensors_vad[i]);
+        auto cache_out_shape = output_tensors_vad[i].shape;
+        auto cache_out_count = bmrt_shape_count(&cache_out_shape);
+        float* data = new float[cache_out_count];
+        status = bm_memcpy_d2s_partial(bm_handle, data, output_tensors_vad[i].device_mem, cache_out_size);
+        assert(BM_SUCCESS == status);
         memcpy((*in_cache)[i-1].data(), data, sizeof(float) * 128*19);
         }
+    }
+    for (int i = 0; i < net_info->output_num; ++i) {
+        bm_free_device(bm_handle, input_tensors_vad[i].device_mem);
+    }
+    for (int i = 0; i < net_info->output_num; ++i) {
+        bm_free_device(bm_handle, output_tensors_vad[i].device_mem);
     }
 }
 
@@ -266,6 +325,12 @@ void FsmnVad::Test() {
 }
 
 FsmnVad::~FsmnVad() {
+    if(p_bmrt){
+        bmrt_destroy(p_bmrt);
+    }
+    if(bm_handle){
+        bm_dev_free(bm_handle);
+    }
 }
 
 FsmnVad::FsmnVad():env_(ORT_LOGGING_LEVEL_ERROR, ""),session_options_{} {

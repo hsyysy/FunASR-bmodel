@@ -56,6 +56,17 @@ namespace funasr {
 #define VAD_CMVN_NAME "am.mvn"
 #define VAD_CONFIG_NAME "config.yaml"
 
+// bmodels
+#define DEV_ID 5
+#define VAD_MODEL_NAME "fsmn_bm1684x_f32.bmodel"
+#define VAD_F16_MODEL_NAME "fsmn_bm1684x_f16.bmodel"
+#define PUNC_MODEL_NAME "punc_bm1684x_f32.bmodel"
+#define ENCODER_MODEL_NAME "encoder_bm1684x_f32.bmodel"
+#define ENCODER_F16_MODEL_NAME "encoder_bm1684x_f16_b10.bmodel"
+#define DECODER_MODEL_NAME "decoder_bm1684x_f32.bmodel"
+#define EMBEDDING_MODEL_NAME "embedding_bm1684x_fp32_1b.bmodel"
+#define LSTM_MODEL_NAME "lstm_bm1684x_fp32_1b.bmodel"
+
 // gpu models
 #define INFER_GPU "gpu"
 #define BATCHSIZE "batch-size"

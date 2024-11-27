@@ -9,7 +9,7 @@ OfflineStream::OfflineStream(std::map<std::string, std::string>& model_path, int
         string vad_cmvn_path;
         string vad_config_path;
     
-        vad_model_path = PathAppend(model_path.at(VAD_DIR), MODEL_NAME);
+        vad_model_path = PathAppend(model_path.at(VAD_DIR), VAD_MODEL_NAME);
         if(model_path.find(VAD_QUANT) != model_path.end() && model_path.at(VAD_QUANT) == "true"){
             vad_model_path = PathAppend(model_path.at(VAD_DIR), QUANT_MODEL_NAME);
         }
@@ -62,7 +62,7 @@ OfflineStream::OfflineStream(std::map<std::string, std::string>& model_path, int
         seg_dict_path = PathAppend(model_path.at(MODEL_DIR), MODEL_SEG_DICT);
         if (access(hw_cpu_model_path.c_str(), F_OK) == 0) { // if model_eb.onnx exist, hotword enabled
           enable_hotword = true;
-          asr_handle->InitHwCompiler(hw_cpu_model_path, thread_num);
+          //asr_handle->InitHwCompiler(hw_cpu_model_path, thread_num);
           asr_handle->InitSegDict(seg_dict_path);
         }
         if (use_gpu && access(hw_gpu_model_path.c_str(), F_OK) == 0) { // if model_eb.torchscript exist, hotword enabled
@@ -71,7 +71,7 @@ OfflineStream::OfflineStream(std::map<std::string, std::string>& model_path, int
           asr_handle->InitSegDict(seg_dict_path);
         }
 
-        am_model_path = PathAppend(model_path.at(MODEL_DIR), MODEL_NAME);
+        am_model_path = PathAppend(model_path.at(MODEL_DIR), ENCODER_MODEL_NAME);
         if(model_path.find(QUANTIZE) != model_path.end() && model_path.at(QUANTIZE) == "true"){
             am_model_path = PathAppend(model_path.at(MODEL_DIR), QUANT_MODEL_NAME);
         }
@@ -109,7 +109,7 @@ OfflineStream::OfflineStream(std::map<std::string, std::string>& model_path, int
         string punc_config_path;
         string token_path;
     
-        punc_model_path = PathAppend(model_path.at(PUNC_DIR), MODEL_NAME);
+        punc_model_path = PathAppend(model_path.at(PUNC_DIR), PUNC_MODEL_NAME);
         if(model_path.find(PUNC_QUANT) != model_path.end() && model_path.at(PUNC_QUANT) == "true"){
             punc_model_path = PathAppend(model_path.at(PUNC_DIR), QUANT_MODEL_NAME);
         }

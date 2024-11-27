@@ -17,6 +17,79 @@ Paraformer::Paraformer()
  hw_env_(ORT_LOGGING_LEVEL_ERROR, "paraformer_hw"),hw_session_options{} {
 }
 
+std::string GetCurrentTimeAsFilename() {
+    // 获取当前时间点
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    auto ms_part = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+    // 转换为本地时间
+    std::tm tm_now;
+#ifdef _WIN32
+    localtime_s(&tm_now, &time_t_now); // Windows 平台
+#else
+    localtime_r(&time_t_now, &tm_now); // Linux/Unix 平台
+#endif
+
+    // 格式化时间
+    std::ostringstream oss;
+    oss << std::put_time(&tm_now, "%Y-%m-%d_%H-%M-%S"); // 格式化为 YYYY-MM-DD_HH-MM-SS
+    oss << "_" << std::setw(3) << std::setfill('0') << ms_part.count(); // 添加毫秒部分，固定 3 位
+    return oss.str();
+}
+
+void WriteFloatArrayToFileWithTimestamp(std::string dir, const float* data, size_t size) {
+    // 获取文件名
+    std::string filename = dir + "/" + GetCurrentTimeAsFilename() + ".bin";
+
+    // 打开文件
+    std::ofstream file(filename, std::ios::binary);
+    //std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return;
+    }
+
+    // 写入数据
+    file.write(reinterpret_cast<const char*>(data), size * sizeof(float));
+    /*
+    for (size_t i = 0; i < size; ++i) {
+        file << data[i] << "\n";
+    }
+    */
+
+    // 关闭文件
+    file.close();
+
+    std::cout << size << " data written to " << filename << std::endl;
+}
+
+// bmrt
+void Paraformer::InitBmrt(const char* en_model, const char* em_model, const char* ls_model, const char* de_model, int dev_id){
+    status = bm_dev_request(&bm_handle, dev_id);
+    assert(BM_SUCCESS == status);
+
+    p_bmrt_offline_encoder = bmrt_create(bm_handle);
+    assert(NULL != p_bmrt_offline_encoder);
+    ret = bmrt_load_bmodel(p_bmrt_offline_encoder, en_model);
+    assert(true == ret);
+
+    p_bmrt_offline_embedding = bmrt_create(bm_handle);
+    assert(NULL != p_bmrt_offline_embedding);
+    ret = bmrt_load_bmodel(p_bmrt_offline_embedding, em_model);
+    assert(true == ret);
+
+    p_bmrt_offline_lstm = bmrt_create(bm_handle);
+    assert(NULL != p_bmrt_offline_lstm);
+    ret = bmrt_load_bmodel(p_bmrt_offline_lstm, ls_model);
+    assert(true == ret);
+
+    p_bmrt_offline_decoder = bmrt_create(bm_handle);
+    assert(NULL != p_bmrt_offline_decoder);
+    ret = bmrt_load_bmodel(p_bmrt_offline_decoder, de_model);
+    assert(true == ret);
+}
+
 // offline
 void Paraformer::InitAsr(const std::string &am_model, const std::string &am_cmvn, const std::string &am_config, const std::string &token_file, int thread_num){
     LoadConfigFromYaml(am_config.c_str());
@@ -31,6 +104,14 @@ void Paraformer::InitAsr(const std::string &am_model, const std::string &am_cmvn
     fbank_opts_.mel_opts.debug_mel = false;
     // fbank_ = std::make_unique<knf::OnlineFbank>(fbank_opts);
 
+    constexpr size_t ENCODER_MODEL_NAME_LENGTH = sizeof(ENCODER_MODEL_NAME) - 1;
+    std::string model_dir = am_model.substr(0, am_model.size() - ENCODER_MODEL_NAME_LENGTH);
+    std::string encoder_model = PathAppend(model_dir, ENCODER_MODEL_NAME);
+    std::string emb_model = PathAppend(model_dir, EMBEDDING_MODEL_NAME);
+    std::string lstm_model = PathAppend(model_dir, LSTM_MODEL_NAME);
+    std::string decoder_model = PathAppend(model_dir, DECODER_MODEL_NAME);
+    InitBmrt(encoder_model.c_str(), emb_model.c_str(), lstm_model.c_str(), decoder_model.c_str(), DEV_ID);
+    /*
     // session_options_.SetInterOpNumThreads(1);
     session_options_.SetIntraOpNumThreads(thread_num);
     session_options_.SetGraphOptimizationLevel(ORT_ENABLE_ALL);
@@ -47,6 +128,7 @@ void Paraformer::InitAsr(const std::string &am_model, const std::string &am_cmvn
 
     GetInputNames(m_session_.get(), m_strInputNames, m_szInputNames);
     GetOutputNames(m_session_.get(), m_strOutputNames, m_szOutputNames);
+    */
     vocab = new Vocab(token_file.c_str());
 	phone_set_ = new PhoneSet(token_file.c_str());
     LoadCmvn(am_cmvn.c_str());
@@ -137,6 +219,14 @@ void Paraformer::InitAsr(const std::string &am_model, const std::string &en_mode
     InitAsr(en_model, de_model, am_cmvn, am_config, online_token_file, thread_num);
 
     // offline
+    constexpr size_t ENCODER_MODEL_NAME_LENGTH = sizeof(ENCODER_MODEL_NAME) - 1;
+    std::string model_dir = am_model.substr(0, am_model.size() - ENCODER_MODEL_NAME_LENGTH);
+    std::string encoder_model = PathAppend(model_dir, ENCODER_MODEL_NAME);
+    std::string emb_model = PathAppend(model_dir, EMBEDDING_MODEL_NAME);
+    std::string lstm_model = PathAppend(model_dir, LSTM_MODEL_NAME);
+    std::string decoder_model = PathAppend(model_dir, DECODER_MODEL_NAME);
+    InitBmrt(encoder_model.c_str(), emb_model.c_str(), lstm_model.c_str(), decoder_model.c_str(), DEV_ID);
+    /*
     try {
         m_session_ = std::make_unique<Ort::Session>(env_, ORTSTRING(am_model).c_str(), session_options_);
         LOG(INFO) << "Successfully load model from " << am_model;
@@ -147,6 +237,7 @@ void Paraformer::InitAsr(const std::string &am_model, const std::string &en_mode
 
     GetInputNames(m_session_.get(), m_strInputNames, m_szInputNames);
     GetOutputNames(m_session_.get(), m_strOutputNames, m_szOutputNames);
+    */
 }
 
 void Paraformer::InitLm(const std::string &lm_file, 
@@ -280,6 +371,21 @@ Paraformer::~Paraformer()
     }
     if(phone_set_){
         delete phone_set_;
+    }
+    if(p_bmrt_offline_encoder){
+        bmrt_destroy(p_bmrt_offline_encoder);
+    }
+    if(p_bmrt_offline_embedding){
+        bmrt_destroy(p_bmrt_offline_embedding);
+    }
+    if(p_bmrt_offline_lstm){
+        bmrt_destroy(p_bmrt_offline_lstm);
+    }
+    if(p_bmrt_offline_decoder){
+        bmrt_destroy(p_bmrt_offline_decoder);
+    }
+    if(bm_handle){
+        bm_dev_free(bm_handle);
     }
 }
 
@@ -452,6 +558,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         wav_feats.insert(wav_feats.end(), frame_feat.begin(), frame_feat.end());
     }
 
+    /*
 #ifdef _WIN_X86
         Ort::MemoryInfo m_memoryInfo = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
 #else
@@ -501,9 +608,363 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         results.push_back(result);
         return results;
     }
+    */
 
     try {
+        /*
+        for (int ii=0;ii<120;ii++) std::cout << "-";std::cout << std::endl;
+        std::ifstream file("whole_audio_pytorch_input/2024-11-21_16-13-08_387.bin", std::ios::binary);
+        if (!file) {
+            std::cerr << "Failed to open file." << std::endl;
+        }
+        // 获取文件大小
+        file.seekg(0, std::ios::end);
+        size_t fileSize = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        // 分配缓冲区并读取数据
+        size_t numElements = fileSize / sizeof(float);  // 计算元素个数
+        std::vector<float> data(numElements);          // 使用 vector 管理内存
+        file.read(reinterpret_cast<char*>(data.data()), fileSize);
+        file.close();
+
+        // 将 .bin 数据写入已有的输入张量
+        float* tensor_data_ptr = input_onnx[0].GetTensorMutableData<float>();
+        std::copy(data.begin(), data.end(), tensor_data_ptr);
+        */
+
+        /*
+        for (int ii=0;ii<m_szInputNames.size();ii++){
+            std::vector<int64_t> inputShape = input_onnx[ii].GetTensorTypeAndShapeInfo().GetShape();
+            int64_t inputCount = std::accumulate(inputShape.begin(), inputShape.end(), 1, std::multiplies<int64_t>());
+            ONNXTensorElementDataType inputType = input_onnx[ii].GetTensorTypeAndShapeInfo().GetElementType();
+            std::cout << "input [" << ii << "]: " << std::left << std::setw(16) << std::setfill(' ') \
+            << m_szInputNames[ii] << ", type = " << inputType << ", count = " \
+            << std::left << std::setw(10) << std::setfill(' ') << inputCount << ", shape = [ ";
+            for(int jj=0;jj<inputShape.size();jj++){
+                if (jj>0) std::cout << ", ";
+                std::cout << inputShape[jj];
+            }
+            std::cout << " ]" << std::endl;
+            if (ii==0){
+                float* indata = input_onnx[ii].GetTensorMutableData<float>();
+                std::cout << "First 10 : ";
+                for (int jj=0;jj<10;jj++)
+                    std::cout << indata[jj] << " ";
+                std::cout << std::endl;
+                std::cout << "Last  10 : ";
+                for (int jj=0;jj<10;jj++)
+                    std::cout << indata[inputCount-jj-1] << " ";
+                std::cout << std::endl;
+                float multicount = 0;
+                for (int jj=0;jj<inputCount;jj++)
+                    multicount += indata[jj];
+                std::cout << "Data sum = " << multicount << std::endl;
+                WriteFloatArrayToFileWithTimestamp("input_data",indata,inputCount);
+            }
+        }
+        */
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
+        net_info = bmrt_get_network_info(p_bmrt_offline_encoder, net_names[0]);
+        assert(NULL != net_info);
+        // input tensor of encoder
+        bm_tensor_t input_tensors_encoder[2];
+
+        bmrt_tensor(&input_tensors_encoder[0], p_bmrt_offline_encoder, BM_FLOAT32, {3, {1, num_frames, feat_dim}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_encoder[0].device_mem, wav_feats.data(), wav_feats.size()*sizeof(float));
+        assert(BM_SUCCESS == status);
+
+        bmrt_tensor(&input_tensors_encoder[1], p_bmrt_offline_encoder, BM_INT32, {1, {1}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_encoder[1].device_mem, &num_frames, sizeof(int32_t));
+        assert(BM_SUCCESS == status);
+
+        // output tensor of encoder
+        bm_tensor_t output_tensors_encoder[4];
+        for (int i=0;i<4;i++) {
+            status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[i].device_mem, net_info->max_output_bytes[i]);
+            assert(BM_SUCCESS == status);
+        }
+        /*
+        status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[0].device_mem, 1*num_frames*512*sizeof(float));
+        assert(BM_SUCCESS == status);
+        status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[1].device_mem, 1*(num_frames+1)*512*sizeof(float));
+        assert(BM_SUCCESS == status);
+        status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[2].device_mem, 1*(num_frames+1)*sizeof(float));
+        assert(BM_SUCCESS == status);
+        status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[3].device_mem, 1*sizeof(float));
+        assert(BM_SUCCESS == status);
+        */
+
+        // forward
+        ret = bmrt_launch_tensor_ex(p_bmrt_offline_encoder, net_names[0], input_tensors_encoder, 2, output_tensors_encoder, 4, true, false);
+        assert(true == ret);
+        bm_thread_sync(bm_handle);
+
+        /*
         auto outputTensor = m_session_->Run(Ort::RunOptions{nullptr}, m_szInputNames.data(), input_onnx.data(), input_onnx.size(), m_szOutputNames.data(), m_szOutputNames.size());
+        for (int ii=0;ii<m_szOutputNames.size();ii++){
+            std::vector<int64_t> outputShape2 = outputTensor[ii].GetTensorTypeAndShapeInfo().GetShape();
+            int64_t outputCount2 = std::accumulate(outputShape2.begin(), outputShape2.end(), 1, std::multiplies<int64_t>());
+            ONNXTensorElementDataType outputType = outputTensor[ii].GetTensorTypeAndShapeInfo().GetElementType();
+            std::cout << "output[" << ii << "]: " << std::left << std::setw(16) << std::setfill(' ') \
+            << m_szOutputNames[ii] << ", type = " << outputType << ", count = " \
+            << std::left << std::setw(10) << std::setfill(' ') << outputCount2 << ", shape = [ ";
+            for(int jj=0;jj<outputShape2.size();jj++) {
+                if (jj>0) std::cout << ", ";
+                std::cout << outputShape2[jj];
+            }
+            std::cout << " ]" << std::endl;
+            if (ii==0){
+                float *outdata = outputTensor[ii].GetTensorMutableData<float>();
+                std::cout << "First 10 : ";
+                for (int jj=0;jj<10;jj++)
+                    std::cout << outdata[jj] << " ";
+                std::cout << std::endl;
+                std::cout << "Last  10 : ";
+                for (int jj=0;jj<10;jj++)
+                    std::cout << outdata[outputCount2-jj-1] << " ";
+                std::cout << std::endl;
+                float multicount = 0;
+                for (int jj=0;jj<outputCount2;jj++)
+                    multicount += outdata[jj];
+                std::cout << "Data sum = " << multicount << std::endl;
+                WriteFloatArrayToFileWithTimestamp("output_data",outdata,outputCount2);
+            }
+        }
+        */
+
+        // encoder_out
+        auto encoder_out_size = bmrt_tensor_bytesize(&output_tensors_encoder[0]);
+        auto encoder_out_shape = output_tensors_encoder[0].shape;
+        auto encoder_out_count = bmrt_shape_count(&encoder_out_shape);
+        float* encoder_out = new float[encoder_out_count];
+        status = bm_memcpy_d2s_partial(bm_handle, encoder_out, output_tensors_encoder[0].device_mem, encoder_out_size);
+        assert(BM_SUCCESS == status);
+
+        // hidden
+        auto output0size = bmrt_tensor_bytesize(&output_tensors_encoder[1]);
+        auto output0shape = output_tensors_encoder[1].shape;
+        auto output0count = bmrt_shape_count(&output0shape);
+        auto output0 = new float[output0count];
+        status = bm_memcpy_d2s_partial(bm_handle, output0, output_tensors_encoder[1].device_mem, output0size);
+        assert(BM_SUCCESS == status);
+        std::vector<std::vector<std::vector<float>>> hidden;
+        int batch_size = output_tensors_encoder[1].shape.dims[0];
+        int time_steps = output_tensors_encoder[1].shape.dims[1];
+        int hidden_size = output_tensors_encoder[1].shape.dims[2];
+        hidden.resize(batch_size);
+        for (int b = 0; b < batch_size; ++b) {
+            hidden[b].resize(time_steps);
+            for (int t = 0; t < time_steps; ++t) {
+                hidden[b][t].resize(hidden_size);
+                for (int h = 0; h < hidden_size; ++h) {
+                    hidden[b][t][h] = output0[b * time_steps * hidden_size + t * hidden_size + h];
+                }
+            }
+        }
+
+        // alphas
+        output0size = bmrt_tensor_bytesize(&output_tensors_encoder[2]);
+        output0shape = output_tensors_encoder[2].shape;
+        output0count = bmrt_shape_count(&output0shape);
+        output0 = new float[output0count];
+        status = bm_memcpy_d2s_partial(bm_handle, output0, output_tensors_encoder[2].device_mem, output0size);
+        assert(BM_SUCCESS == status);
+        std::vector<std::vector<float>> alphas;
+        batch_size = output_tensors_encoder[2].shape.dims[0];
+        time_steps = output_tensors_encoder[2].shape.dims[1];
+        alphas.resize(batch_size);
+        for (int b = 0; b < batch_size; ++b) {
+            alphas[b].resize(time_steps);
+            for (int t = 0; t < time_steps; ++t) {
+                alphas[b][t] = output0[b * time_steps + t];
+            }
+        }
+
+        // pre_token_length
+        output0size = bmrt_tensor_bytesize(&output_tensors_encoder[3]);
+        output0shape = output_tensors_encoder[3].shape;
+        output0count = bmrt_shape_count(&output0shape);
+        auto pre_token_length = new float[output0count];
+        status = bm_memcpy_d2s_partial(bm_handle, pre_token_length, output_tensors_encoder[3].device_mem, output0size);
+        assert(BM_SUCCESS == status);
+        auto token_num_int_f = pre_token_length[0];
+        for (int i=1;i<output0count;i++)
+            if (pre_token_length[i] > token_num_int_f)
+                token_num_int_f = pre_token_length[i];
+        auto token_num_int = static_cast<int>(token_num_int_f);
+
+        std::vector<long> pre_token_length_rounded;
+        for (int i = 0; i < output0count; i++){
+            long rounded_value = static_cast<long>(std::round(pre_token_length[i]));
+            pre_token_length_rounded.push_back(rounded_value);
+        }
+
+        // before next bmodel
+        auto cif_result = cif(hidden, alphas, 1.0f);
+
+        auto pre_acoustic_embeds = cif_result.first;
+        auto cif_peak = cif_result.second;
+        int pre_acoustic_embeds2_count = pre_acoustic_embeds.size()*token_num_int*pre_acoustic_embeds[0][0].size();
+        float pre_acoustic_embeds2[pre_acoustic_embeds2_count];
+        int k=0;
+        for (int i = 0; i < pre_acoustic_embeds.size(); ++i) {
+            for (int j = 0; j < token_num_int; ++j) {
+                for (int jj = 0; jj < pre_acoustic_embeds[0][0].size(); ++jj) {
+                    pre_acoustic_embeds2[k] = pre_acoustic_embeds[i][j][jj];
+                    k++;
+                }
+            }
+        }
+
+        /*
+        std::vector<std::vector<int>> hw_list = {{1}};
+        auto hw_list_pad = pad_list(hw_list,0);
+        int* value = new int[hw_list_pad.size()*hw_list_pad[0].size()];
+        k = 0;
+        for (int i=0;i<hw_list_pad.size();i++){
+            for (int j=0;j<hw_list_pad[i].size();j++){
+                value[k] = hw_list_pad[i][j];
+            }
+        }
+        */
+        int32_t value = 1;
+        bm_tensor_t input_tensors_embedding[1];
+        bmrt_tensor(&input_tensors_embedding[0], p_bmrt_offline_embedding, BM_INT32, {2, {1, 1}});
+        bm_tensor_t output_tensors_embedding[1];
+        bmrt_tensor(&output_tensors_embedding[0], p_bmrt_offline_embedding, BM_FLOAT32, {3, {1, 1, 512}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_embedding[0].device_mem, &value, sizeof(int32_t));
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_offline_embedding, &net_names);
+        ret = bmrt_launch_tensor_ex(p_bmrt_offline_embedding, net_names[0], input_tensors_embedding, 1, output_tensors_embedding, 1, true, false);
+        assert(true == ret);
+        bm_thread_sync(bm_handle);
+
+        bm_tensor_t output_tensors_lstm[1];
+        bmrt_tensor(&output_tensors_lstm[0], p_bmrt_offline_lstm, BM_FLOAT32, {3, {1, 1, 512}});
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_offline_lstm, &net_names);
+        ret = bmrt_launch_tensor_ex(p_bmrt_offline_lstm, net_names[0], output_tensors_embedding, 1, output_tensors_lstm, 1, true, false);
+        assert(true == ret);
+        bm_thread_sync(bm_handle);
+
+        float hw_embed[512];
+        output0size = bmrt_tensor_bytesize(&output_tensors_lstm[0]);
+        status = bm_memcpy_d2s_partial(bm_handle, hw_embed, output_tensors_lstm[0].device_mem, output0size);
+        assert(BM_SUCCESS == status);
+
+        float hw_embed2[512*batch_size];
+        for (int i=0;i<batch_size;i++){
+            for (int j=0;j<512;j++){
+                hw_embed2[512*i+j] = hw_embed[j];
+            }
+        }
+
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
+        net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
+        assert(NULL != net_info);
+        bm_tensor_t input_tensors_decoder[5];
+
+        bmrt_tensor(&input_tensors_decoder[0], p_bmrt_offline_decoder, BM_FLOAT32, {3, {encoder_out_shape.dims[0], encoder_out_shape.dims[1], encoder_out_shape.dims[2]}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[0].device_mem, encoder_out, encoder_out_count*sizeof(float));
+        assert(BM_SUCCESS == status);
+
+        bmrt_tensor(&input_tensors_decoder[1], p_bmrt_offline_decoder, BM_INT32, {1, {batch_size}});
+        status = bm_memcpy_d2d(bm_handle, input_tensors_decoder[1].device_mem, 0, input_tensors_encoder[1].device_mem, 0, bmrt_tensor_bytesize(&input_tensors_encoder[1]));
+        assert(BM_SUCCESS == status);
+
+        bmrt_tensor(&input_tensors_decoder[2], p_bmrt_offline_decoder, BM_FLOAT32, {3, {batch_size, token_num_int, static_cast<int>(pre_acoustic_embeds[0][0].size())}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[2].device_mem, pre_acoustic_embeds2, pre_acoustic_embeds2_count*sizeof(float));
+        assert(BM_SUCCESS == status);
+
+        bmrt_tensor(&input_tensors_decoder[3], p_bmrt_offline_decoder, BM_INT32, {1, {batch_size}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[3].device_mem, pre_token_length_rounded.data(), batch_size*sizeof(int32_t));
+        assert(BM_SUCCESS == status);
+
+        bmrt_tensor(&input_tensors_decoder[4], p_bmrt_offline_decoder, BM_FLOAT32, {3, {batch_size, 1, 512}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[4].device_mem, hw_embed2, batch_size*512*sizeof(float));
+        assert(BM_SUCCESS == status);
+
+        bm_tensor_t output_tensors_decoder[1];
+
+        status = bm_malloc_device_byte(bm_handle, &output_tensors_decoder[0].device_mem, net_info->max_output_bytes[0]);
+        assert(BM_SUCCESS == status);
+
+        ret = bmrt_launch_tensor_ex(p_bmrt_offline_decoder, net_names[0], input_tensors_decoder, 5, output_tensors_decoder, 1, true, false);
+        assert(true == ret);
+        bm_thread_sync(bm_handle);
+
+        auto decoder_out_size = bmrt_tensor_bytesize(&output_tensors_decoder[0]);
+        auto decoder_out_shape = output_tensors_decoder[0].shape;
+        auto decoder_out_count = bmrt_shape_count(&decoder_out_shape);
+        float* decoder_out = new float[decoder_out_count];
+        status = bm_memcpy_d2s_partial(bm_handle, decoder_out, output_tensors_decoder[0].device_mem, decoder_out_size);
+        assert(BM_SUCCESS == status);
+        auto decoder_out_lens = decoder_out_shape.dims[1];
+        auto decoder_out_vocab = decoder_out_shape.dims[2];
+
+        /*
+        std::cout << "decoder out shape = [" << decoder_out_shape.dims[0] << ", " << decoder_out_shape.dims[1] << ", " << decoder_out_shape.dims[2] << "]" << std::endl;
+
+        std::cout << "First 10 : ";
+        for (int jj=0;jj<10;jj++)
+            std::cout << decoder_out[jj] << " ";
+        std::cout << std::endl;
+        std::cout << "Last  10 : ";
+        for (int jj=0;jj<10;jj++)
+            std::cout << decoder_out[decoder_out_count-jj-1] << " ";
+        std::cout << std::endl;
+        */
+
+        // free device memory
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
+        net_info = bmrt_get_network_info(p_bmrt_offline_encoder, net_names[0]);
+        assert(NULL != net_info);
+        for (int i = 0; i < net_info->input_num; ++i) {
+            bm_free_device(bm_handle, input_tensors_encoder[i].device_mem);
+        }
+        for (int i = 0; i < net_info->output_num; ++i) {
+            bm_free_device(bm_handle, output_tensors_encoder[i].device_mem);
+        }
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_offline_embedding, &net_names);
+        net_info = bmrt_get_network_info(p_bmrt_offline_embedding, net_names[0]);
+        assert(NULL != net_info);
+        for (int i = 0; i < net_info->input_num; ++i) {
+            bm_free_device(bm_handle, input_tensors_embedding[i].device_mem);
+        }
+        for (int i = 0; i < net_info->output_num; ++i) {
+            bm_free_device(bm_handle, output_tensors_embedding[i].device_mem);
+        }
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_offline_lstm, &net_names);
+        net_info = bmrt_get_network_info(p_bmrt_offline_lstm, net_names[0]);
+        assert(NULL != net_info);
+        for (int i = 0; i < net_info->output_num; ++i) {
+            bm_free_device(bm_handle, output_tensors_lstm[i].device_mem);
+        }
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
+        net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
+        assert(NULL != net_info);
+        for (int i = 0; i < net_info->input_num; ++i) {
+            bm_free_device(bm_handle, input_tensors_decoder[i].device_mem);
+        }
+        for (int i = 0; i < net_info->output_num; ++i) {
+            bm_free_device(bm_handle, output_tensors_decoder[i].device_mem);
+        }
+
+        result = BeamSearch(wfst_decoder, decoder_out, decoder_out_lens, decoder_out_vocab);
+        if (input_finished) {
+            result = FinalizeDecode(wfst_decoder);
+        }
+
+        for (int ii=0;ii<120;ii++) std::cout << "-";std::cout << std::endl;
+
+        /*
         std::vector<int64_t> outputShape = outputTensor[0].GetTensorTypeAndShapeInfo().GetShape();
         //LOG(INFO) << "paraformer out shape " << outputShape[0] << " " << outputShape[1] << " " << outputShape[2];
 
@@ -543,6 +1004,8 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
                 }
 			}
         }
+        */
+        std::cout << result << std::endl;
     }
     catch (std::exception const &e)
     {
@@ -631,7 +1094,23 @@ std::vector<std::vector<float>> Paraformer::CompileHotwordEmbedding(std::string 
 
     std::vector<std::vector<float>> result;
     try {
+        for (int ii=0;ii<hw_m_szInputNames.size();ii++){
+            std::vector<int64_t> inputShape = input_onnx[ii].GetTensorTypeAndShapeInfo().GetShape();
+            ONNXTensorElementDataType inputType = input_onnx[ii].GetTensorTypeAndShapeInfo().GetElementType();
+            std::cout << "hw_input [" << ii << "]: " << hw_m_szInputNames[ii] << ", type = " << inputType << ", shape = [ ";
+            for(int jj=0;jj<inputShape.size();jj++)
+                std::cout << inputShape[jj] << ", ";
+            std::cout << " ]" << std::endl;
+        }
         auto outputTensor = hw_m_session->Run(Ort::RunOptions{nullptr}, hw_m_szInputNames.data(), input_onnx.data(), input_onnx.size(), hw_m_szOutputNames.data(), hw_m_szOutputNames.size());
+        for (int ii=0;ii<hw_m_szOutputNames.size();ii++){
+            std::vector<int64_t> outputShape2 = outputTensor[ii].GetTensorTypeAndShapeInfo().GetShape();
+            ONNXTensorElementDataType outputType = outputTensor[ii].GetTensorTypeAndShapeInfo().GetElementType();
+            std::cout << "hw_output[" << ii << "]: " << hw_m_szOutputNames[ii] << ", type = " << outputType << ", shape = [ ";
+            for(int jj=0;jj<outputShape2.size();jj++)
+                std::cout << outputShape2[jj] << ", ";
+            std::cout << " ]" << std::endl;
+        }
         std::vector<int64_t> outputShape = outputTensor[0].GetTensorTypeAndShapeInfo().GetShape();
 
         int64_t outputCount = std::accumulate(outputShape.begin(), outputShape.end(), 1, std::multiplies<int64_t>());

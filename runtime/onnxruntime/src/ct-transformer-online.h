@@ -33,5 +33,13 @@ public:
 	void Transport(vector<float>& In, int nRows, int nCols);
 	void VadMask(int size, int vad_pos,vector<float>& Result);
 	void Triangle(int text_length, vector<float>& Result);
+
+	// bmrt
+	bm_handle_t bm_handle;
+	bm_status_t status;
+	bool ret;
+	void* p_bmrt;
+	const bm_net_info_t *net_info;
+	const char **net_names;
 };
 } // namespace funasr

@@ -30,5 +30,13 @@ public:
 	~CTTransformer();
 	vector<int>  Infer(vector<int32_t> input_data);
 	string AddPunc(const char* sz_input, std::string language="zh-cn");
+
+	// bmrt
+	bm_handle_t bm_handle;
+	bm_status_t status;
+	bool ret;
+	void* p_bmrt;
+	const bm_net_info_t *net_info;
+	const char **net_names;
 };
 } // namespace funasr

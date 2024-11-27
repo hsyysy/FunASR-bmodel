@@ -50,6 +50,11 @@ include_directories(${PROJECT_SOURCE_DIR}/third_party/jieba/include/limonp/inclu
 include_directories(${PROJECT_SOURCE_DIR}/third_party/kaldi)
 include_directories(${PROJECT_SOURCE_DIR}/third_party/json/include)
 
+# for bmrt
+find_package(libsophon REQUIRED)
+include_directories(${LIBSOPHON_INCLUDE_DIRS})
+link_directories(${LIBSOPHON_LIB_DIRS})
+
 if(GPU)
     add_definitions(-DUSE_GPU)
     set(TORCH_DIR "/usr/local/lib/python3.8/dist-packages/torch")

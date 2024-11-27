@@ -42,6 +42,7 @@ namespace funasr {
     public:
         Paraformer();
         ~Paraformer();
+        void InitBmrt(const char* en_model, const char* em_model, const char* ls_model, const char* de_model, int dev_id);
         void InitAsr(const std::string &am_model, const std::string &am_cmvn, const std::string &am_config, const std::string &token_file, int thread_num);
         // online
         void InitAsr(const std::string &en_model, const std::string &de_model, const std::string &am_cmvn, const std::string &am_config, const std::string &token_file, int thread_num);
@@ -87,6 +88,18 @@ namespace funasr {
         vector<const char*> m_szOutputNames;
 
         std::string language="zh-cn";
+
+        // bmrt
+        bm_handle_t bm_handle;
+        bm_status_t status;
+        bool ret;
+
+        void* p_bmrt_offline_encoder;
+        void* p_bmrt_offline_embedding;
+        void* p_bmrt_offline_lstm;
+        void* p_bmrt_offline_decoder;
+        const bm_net_info_t *net_info;
+        const char **net_names;
 
         // paraformer-online
         std::shared_ptr<Ort::Session> encoder_session_ = nullptr;

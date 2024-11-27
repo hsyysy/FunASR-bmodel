@@ -1098,4 +1098,152 @@ void SmoothTimestamps(std::string &str_punc, std::string &str_itn, std::string &
     return;
 }
 
+std::pair<std::vector<std::vector<std::vector<float>>>, std::vector<std::vector<float>>> cif(
+    const std::vector<std::vector<std::vector<float>>>& hidden,
+    const std::vector<std::vector<float>>& alphas,
+    float threshold) {
+
+    int batch_size = hidden.size();      // Number of batches
+    int len_time = hidden[0].size();     // Length of time (sequence length)
+    int hidden_size = hidden[0][0].size();  // Hidden size (feature dimension)
+
+    // Initialize vectors
+    std::vector<float> integrate(batch_size, 0.0f);
+    std::vector<std::vector<float>> frame(batch_size, std::vector<float>(hidden_size, 0.0f));
+    std::vector<std::vector<float>> list_fires;
+    std::vector<std::vector<std::vector<float>>> list_frames;
+
+    // Time loop
+    for (int t = 0; t < len_time; ++t) {
+        std::vector<float> alpha(batch_size);
+        std::vector<float> distribution_completion(batch_size, 0.0f);
+
+        // Extract alpha values for this time step
+        for (int i = 0; i < batch_size; ++i) {
+            alpha[i] = alphas[i][t];
+            distribution_completion[i] = 1.0f - integrate[i];
+        }
+
+        // Update integrate
+        for (int i = 0; i < batch_size; ++i) {
+            integrate[i] += alpha[i];
+        }
+
+        list_fires.push_back(integrate);  // Save integrate values for this time step
+
+        // Process fire condition
+        std::vector<bool> fire_place(batch_size);
+        for (int i = 0; i < batch_size; ++i) {
+            fire_place[i] = integrate[i] >= threshold;
+        }
+
+        // Update integrate based on fire condition
+        for (int i = 0; i < batch_size; ++i) {
+            if (fire_place[i]) {
+                integrate[i] -= 1.0f;
+            }
+        }
+
+        // Calculate current and remainds
+        std::vector<float> cur(batch_size, 0.0f);
+        std::vector<float> remains(batch_size, 0.0f);
+        for (int i = 0; i < batch_size; ++i) {
+            if (fire_place[i]) {
+                cur[i] = distribution_completion[i];
+            } else {
+                cur[i] = alpha[i];
+            }
+            remains[i] = alpha[i] - cur[i];
+        }
+
+        // Update frame
+        for (int i = 0; i < batch_size; ++i) {
+            for (int j = 0; j < hidden_size; ++j) {
+                frame[i][j] += cur[i] * hidden[i][t][j];
+            }
+        }
+        list_frames.push_back(frame);  // Save frame values for this time step
+
+        // Adjust frame based on fire condition
+        for (int i = 0; i < batch_size; ++i) {
+            if (fire_place[i]) {
+                for (int j = 0; j < hidden_size; ++j) {
+                    frame[i][j] = remains[i] * hidden[i][t][j];
+                }
+            }
+        }
+    }
+
+    // Create output tensors
+    std::vector<std::vector<float>> fires(batch_size, std::vector<float>(len_time));
+    std::vector<std::vector<std::vector<float>>> frames(batch_size, std::vector<std::vector<float>>(len_time, std::vector<float>(hidden_size)));
+
+    // Fill fires and frames with the results
+    for (int b = 0; b < batch_size; ++b) {
+        for (int t = 0; t < len_time; ++t) {
+            fires[b][t] = list_fires[t][b];
+            for (int j = 0; j < hidden_size; ++j) {
+                frames[b][t][j] = list_frames[t][b][j];
+            }
+        }
+    }
+
+    // Process labels based on fire thresholds
+    std::vector<std::vector<std::vector<float>>> list_ls;
+    std::vector<int> len_labels(batch_size);
+    int max_label_len = 0;
+
+    // Calculate label lengths
+    for (int i = 0; i < batch_size; ++i) {
+        len_labels[i] = std::round(std::accumulate(alphas[i].begin(), alphas[i].end(), 0.0f));
+        max_label_len = std::max(max_label_len, len_labels[i]);
+    }
+
+    // Adjust labels
+    for (int b = 0; b < batch_size; ++b) {
+        std::vector<float> fire = fires[b];
+        std::vector<std::vector<float>> l;
+
+        // Select frames based on fire threshold
+        for (int t = 0; t < len_time; ++t) {
+            if (fire[t] >= threshold) {
+                l.push_back(frames[b][t]);
+            }
+        }
+
+        // Pad frames if necessary
+        while (l.size() < max_label_len) {
+            l.push_back(std::vector<float>(hidden_size, 0.0f));
+        }
+
+        list_ls.push_back(l);
+    }
+
+    // Return the final result
+    return std::make_pair(list_ls, fires);
+}
+
+std::vector<std::vector<int>> pad_list(const std::vector<std::vector<int>>& xs, int pad_value) {
+    int n_batch = xs.size();  // 获取批量大小
+    int max_len = 0;
+
+    // 找到最大序列长度
+    for (const auto& x : xs) {
+        max_len = std::max(max_len, static_cast<int>(x.size()));
+    }
+
+    // 创建一个填充张量，大小为 (n_batch, max_len)
+    std::vector<std::vector<int>> pad(n_batch, std::vector<int>(max_len, pad_value));
+
+    // 将每个输入向量拷贝到填充向量的对应位置
+    for (int i = 0; i < n_batch; ++i) {
+        int length = xs[i].size();
+        for (int j = 0; j < length; ++j) {
+            pad[i][j] = xs[i][j];
+        }
+    }
+
+    return pad;
+}
+
 } // namespace funasr

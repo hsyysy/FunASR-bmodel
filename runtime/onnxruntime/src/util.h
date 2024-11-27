@@ -70,5 +70,10 @@ void TimestampOnnx( std::vector<float>& us_alphas,
 bool IsTargetFile(const std::string& filename, const std::string target);
 void ExtractHws(string hws_file, unordered_map<string, int> &hws_map);
 void ExtractHws(string hws_file, unordered_map<string, int> &hws_map, string& nn_hotwords_);
+extern std::pair<std::vector<std::vector<std::vector<float>>>, std::vector<std::vector<float>>> cif(
+const std::vector<std::vector<std::vector<float>>>& hidden,
+const std::vector<std::vector<float>>& alphas,
+float threshold);
+extern std::vector<std::vector<int>> pad_list(const std::vector<std::vector<int>>& xs, int pad_value);
 } // namespace funasr
 #endif
