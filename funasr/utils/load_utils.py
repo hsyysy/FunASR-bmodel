@@ -153,11 +153,12 @@ def load_bytes(input):
     array = np.frombuffer((middle_data.astype(dtype) - offset) / abs_max, dtype=np.float32)
     return array
 
+
 def validate_frame_rate(
     input,
     fs: int = 16000,
 ):
-    
+
     # 将文件读取为字节流
     byte_data = BytesIO(input)
 
@@ -175,7 +176,7 @@ def validate_frame_rate(
 
         # 获取重新采样后的字节流数据
         input = output.read()
-        
+
     return input
 
 
