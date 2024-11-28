@@ -138,7 +138,7 @@ def load_audio_text_image_video(
 
 
 def load_bytes(input):
-    #input = validate_frame_rate(input)
+    # input = validate_frame_rate(input)
     middle_data = np.frombuffer(input, dtype=np.int16)
     middle_data = np.asarray(middle_data)
     if middle_data.dtype.kind not in "iu":
