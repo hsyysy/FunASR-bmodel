@@ -605,11 +605,12 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
 
         // output tensor of encoder
         bm_tensor_t output_tensors_encoder[4];
+        /*
         for (int i=0;i<4;i++) {
             status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[i].device_mem, net_info->max_output_bytes[i]);
             assert(BM_SUCCESS == status);
         }
-        /*
+        */
         status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[0].device_mem, 1*num_frames*512*sizeof(float));
         assert(BM_SUCCESS == status);
         status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[1].device_mem, 1*(num_frames+1)*512*sizeof(float));
@@ -618,7 +619,6 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         assert(BM_SUCCESS == status);
         status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[3].device_mem, 1*sizeof(float));
         assert(BM_SUCCESS == status);
-        */
 
         // forward
         ret = bmrt_launch_tensor_ex(p_bmrt_offline_encoder, net_names[0], input_tensors_encoder, 2, output_tensors_encoder, 4, true, false);
@@ -697,14 +697,16 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
 
         auto pre_acoustic_embeds = cif_result.first;
         auto cif_peak = cif_result.second;
-        int pre_acoustic_embeds2_count = pre_acoustic_embeds.size()*token_num_int*pre_acoustic_embeds[0][0].size();
+        int pre_acoustic_embeds_size = pre_acoustic_embeds.size();
+        int feature_size = pre_acoustic_embeds[0][0].size();
+        int pre_acoustic_embeds2_count = pre_acoustic_embeds_size * token_num_int * feature_size;
         float pre_acoustic_embeds2[pre_acoustic_embeds2_count];
         int k=0;
-        for (int i = 0; i < pre_acoustic_embeds.size(); ++i) {
+        for (int i = 0; i < pre_acoustic_embeds_size; ++i) {
             for (int j = 0; j < token_num_int; ++j) {
-                for (int jj = 0; jj < pre_acoustic_embeds[0][0].size(); ++jj) {
-                    pre_acoustic_embeds2[k] = pre_acoustic_embeds[i][j][jj];
-                    k++;
+                const auto& row = pre_acoustic_embeds[i][j];
+                for (int jj = 0; jj < feature_size; ++jj) {
+                    pre_acoustic_embeds2[k++] = row[jj];
                 }
             }
         }
