@@ -16,5 +16,5 @@ python3 funasr_wss_server_with_id.py \
     --vad_model $vad_model \
     --punc_model $punc_model \
     --device cpu \
-    --dev_id 5 \
+    --dev_id 0 \
     --port 12333

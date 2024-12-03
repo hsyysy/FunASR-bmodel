@@ -10,7 +10,7 @@ echo "unzip is installed in your system!"
 pip3 install dfss -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade
 
 scripts_dir=$(dirname $(readlink -f "$0"))
-name=speech_campplus_sv_zh-cn_16k-common
+name=speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404
 pushd $scripts_dir
 
 # models
