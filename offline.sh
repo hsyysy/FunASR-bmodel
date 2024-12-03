@@ -1,10 +1,10 @@
-runtime=./bmodel
+model_dir=./bmodel
 target=BM1684X
 
 # bmodel
-model=${runtime}/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404/models/$target
-vad_dir=${runtime}/speech_fsmn_vad_zh-cn-16k-common/models/$target
-punc_dir=${runtime}/punc_ct-transformer_zh-cn-common-vocab272727/models/$target
+model=${model_dir}/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404/models/$target
+vad_dir=${model_dir}/speech_fsmn_vad_zh-cn-16k-common/models/$target
+punc_dir=${model_dir}/punc_ct-transformer_zh-cn-common-vocab272727/models/$target
 
 # other model
 lm_dir=$HOME/.cache/modelscope/hub/iic/speech_ngram_lm_zh-cn-ai-wesp-fst
