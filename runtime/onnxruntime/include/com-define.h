@@ -58,14 +58,17 @@ namespace funasr {
 
 // bmodels
 #define DEV_ID 5
-#define VAD_MODEL_NAME "fsmn_bm1684x_f32.bmodel"
-#define VAD_F16_MODEL_NAME "fsmn_bm1684x_f16.bmodel"
-#define PUNC_MODEL_NAME "punc_bm1684x_f32.bmodel"
-#define ENCODER_MODEL_NAME "encoder_bm1684x_f32.bmodel"
-#define ENCODER_F16_MODEL_NAME "encoder_bm1684x_f16_b10.bmodel"
-#define DECODER_MODEL_NAME "decoder_bm1684x_f32.bmodel"
-#define EMBEDDING_MODEL_NAME "embedding_bm1684x_fp32_1b.bmodel"
-#define LSTM_MODEL_NAME "lstm_bm1684x_fp32_1b.bmodel"
+#define VAD_MODEL_NAME "fsmn_fp32.bmodel"
+#define VAD_F16_MODEL_NAME "fsmn_fp16.bmodel"
+#define PUNC_MODEL_NAME "punc_fp32.bmodel"
+#define ENCODER_MODEL_NAME "encoder_fp32_1b.bmodel"
+#define ENCODER_F16_MODEL_NAME "encoder_fp16_10b.bmodel"
+#define DECODER_MODEL_NAME "decoder_fp32_1b.bmodel"
+#define EMBEDDING_MODEL_NAME "embedding_fp32.bmodel"
+#define LSTM_MODEL_NAME "lstm_fp32.bmodel"
+
+#define ENCODER_ONLINE_MODEL_NAME "online_encoder_fp32.bmodel"
+#define DECODER_ONLINE_MODEL_NAME "online_decoder1_fp32.bmodel"
 
 // gpu models
 #define INFER_GPU "gpu"

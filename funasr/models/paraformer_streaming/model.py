@@ -68,9 +68,9 @@ class ParaformerStreaming(Paraformer):
             )
             self.decoder_attention_chunk_type = kwargs.get("decoder_attention_chunk_type", "chunk")
 
-        self.encoder_bmodel = EngineOV(kwargs["model_path"]+"/online_encoder_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
-        self.decoder0_bmodel = EngineOV(kwargs["model_path"]+"/online_decoder0_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
-        self.decoder1_bmodel = EngineOV(kwargs["model_path"]+"/online_decoder1_bm1684x_f32.bmodel", device_id=kwargs['dev_id'])
+        self.encoder_bmodel = EngineOV(kwargs["model_path"]+"/online_encoder_fp32.bmodel", device_id=kwargs['dev_id'])
+        self.decoder0_bmodel = EngineOV(kwargs["model_path"]+"/online_decoder0_fp32.bmodel", device_id=kwargs['dev_id'])
+        self.decoder1_bmodel = EngineOV(kwargs["model_path"]+"/online_decoder1_fp32.bmodel", device_id=kwargs['dev_id'])
 
         self.predictor.cif_conv1d.weight = torch.load(kwargs["model_path"]+"/cif_conv1d_weight.pt",weights_only=True)
         self.predictor.cif_conv1d.bias   = torch.load(kwargs["model_path"]+"/cif_conv1d_bias.pt",weights_only=True)

@@ -1,18 +1,22 @@
-## model from export.py
-model_dir=$HOME/funasr_onnx_model
+model_dir=./bmodel
+target=BM1684X
 
-model=./bmodel/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404
+# bmodel
+model=${model_dir}/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404/models/$target
+vad_dir=${model_dir}/speech_fsmn_vad_zh-cn-16k-common/models/$target
+punc_dir=${model_dir}/punc_ct-transformer_zh-cn-common-vocab272727/models/$target
 
-online_model=${model_dir}/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online
+# onnx model
+online_model=$HOME/funasr_onnx_model/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online
 
-vad_dir=./bmodel/speech_fsmn_vad_zh-cn-16k-common-pytorch
-
-punc_dir=./bmodel/punc_ct-transformer_zh-cn-common-vocab272727-pytorch
+# other model
+lm_dir=$HOME/modelscope/speech_ngram_lm_zh-cn-ai-wesp-fst
+itn_dir=$HOME/modelscope/fst_itn_zh
 
 quantize=false
 
 ./runtime/onnxruntime/build/bin/funasr-onnx-2pass \
-    --mode 2pass \
+    --mode offline \
     --model-dir         ${model}    \
     --online-model-dir  ${online_model} \
     --vad-dir           ${vad_dir}  \
@@ -20,8 +24,8 @@ quantize=false
     --quantize          ${quantize} \
     --vad-quant         ${quantize} \
     --punc-quant        ${quantize} \
-    --lm-dir  $HOME/modelscope/speech_ngram_lm_zh-cn-ai-wesp-fst \
-    --itn-dir $HOME/modelscope/fst_itn_zh \
+    --lm-dir            ${lm_dir} \
+    --itn-dir           ${itn_dir} \
     --wav-path ./audio/test_audio_20241017.wav
 
     #--wav-path ./test_asr.wav
