@@ -18,7 +18,7 @@
 
 FunASR是一个流行的语音识别框架，本目录将常用的几个模型移植到算丰平台。
 
-该例程支持在V23.09LTS SP3及以上的BM1684X SOPHONSDK, 或在v1.7.0及以上的BM1688/CV186X SOPHONSDK上运行，支持在插有1684X加速卡(SC7系列)的x86主机上运行，也可以在1684X SoC设备（如SE7、SM7、Airbox等）上运行，也支持在BM1688/CV186X Soc设备（如SE9-16）上运行。
+该例程支持在V23.09LTS SP3及以上的BM1684X SOPHONSDK, 或在v1.7.0及以上的BM1688 SOPHONSDK上运行，支持在插有1684X加速卡(SC7系列)的x86主机上运行，也可以在1684X SoC设备（如SE7、SM7、Airbox等）上运行，也支持在BM1688 Soc设备（如SE9-16）上运行。
 
 ## 2.特性
 
