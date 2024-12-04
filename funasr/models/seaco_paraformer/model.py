@@ -107,13 +107,13 @@ class SeacoParaformer(BiCifParaformer, Paraformer):
         self.NO_BIAS = kwargs.get("NO_BIAS", 8377)
         self.predictor_name = kwargs.get("predictor")
 
-        self.encoder_bmodel = EngineOV(kwargs["model_path"]+"/encoder_fp32.bmodel", device_id=kwargs['dev_id'])
+        self.encoder_bmodel = EngineOV(kwargs["model_path"]+"/encoder_fp32_10b.bmodel", device_id=kwargs['dev_id'])
         #self.encoder_bmodel = EngineOV(kwargs["model_path"]+"/encoder2_fp16_10b.bmodel", device_id=kwargs['dev_id'])
 
-        self.predictor_bmodel = EngineOV(kwargs["model_path"]+"/predictor_fp32.bmodel", device_id=kwargs['dev_id'])
+        self.predictor_bmodel = EngineOV(kwargs["model_path"]+"/predictor_fp32_10b.bmodel", device_id=kwargs['dev_id'])
         #self.predictor_bmodel = EngineOV(kwargs["model_path"]+"/predictor_fp16_10b.bmodel", device_id=kwargs['dev_id'])
 
-        self.decoder_bmodel = EngineOV(kwargs["model_path"]+"/decoder_fp32.bmodel", device_id=kwargs['dev_id'])
+        self.decoder_bmodel = EngineOV(kwargs["model_path"]+"/decoder_fp32_10b.bmodel", device_id=kwargs['dev_id'])
 
     def forward(
         self,
