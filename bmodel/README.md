@@ -44,12 +44,12 @@ chmod -R +x scripts/
 支持的模型
 |  模型名称  |  Python  | C++ |
 |------------|----------|-----|
-|speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404|支持|支持|
-|speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online|支持|不支持|
-|speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404|支持|不支持|
-|speech_fsmn_vad_zh-cn-16k-common|支持|支持|
-|punc_ct-transformer_zh-cn-common-vocab272727|支持|支持|
-|speech_campplus_sv_zh-cn_16k-common|支持|不支持|
+|[speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404](speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404)|支持|支持|
+|[speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online](speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online)|支持|不支持|
+|[speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404](speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404)|支持|不支持|
+|[speech_fsmn_vad_zh-cn-16k-common](speech_fsmn_vad_zh-cn-16k-common)|支持|支持|
+|[punc_ct-transformer_zh-cn-common-vocab272727](punc_ct-transformer_zh-cn-common-vocab272727)|支持|支持|
+|[speech_campplus_sv_zh-cn_16k-common](speech_campplus_sv_zh-cn_16k-common)|支持|不支持|
 
 ## 3.2 编译模型
 请参考模型目录内的readme.md编译
@@ -70,6 +70,7 @@ tpu_perf-1.2.35-py3-none-manylinux2014_aarch64.whl
 pip3 install -r requirements.txt
 ```
 C++编译所需的外部库请参考对应readme.md文件。
+C++程序还需要[speech_ngram_lm_zh-cn-ai-wesp-fst](https://www.modelscope.cn/models/iic/speech_ngram_lm_zh-cn-ai-wesp-fst)和[fst_itn_zh](https://www.modelscope.cn/models/thuduj12/fst_itn_zh)，可在原[FunASR](https://github.com/modelscope/FunASR)仓库的推理过程中自动下载，或者从链接中下载，并在脚本中配置目录。
 
 ### 4.2 离线识别
 Python离线识别可参考offline.py，配置好音频文件路径，以及平台和设备ID后，即可执行推理。
@@ -81,6 +82,6 @@ C++编译可参考[runtime/onnxruntime/readme.md](../runtime/onnxruntime/readme.
 ### 4.3 在线识别
 Python在线识别可参考run_server.sh开启服务，通过run_client.sh测试
 
-C++编译可参考[runtime/websocket/readme.md](../runtime/websocket/readme_zh.md)编译，执行cpp_server.sh开启服务，通过cpp_client.sh测试，由于目前online模型暂未适配C++，因此online识别部分由cpu通过onnx推理完成。(在[原仓库](https://github.com/modelscope/FunASR)运行bmodel/export_onnx.py可转出onnx模型)
+C++编译可参考[runtime/websocket/readme.md](../runtime/websocket/readme_zh.md)编译，执行cpp_server.sh开启服务，通过cpp_client.sh测试，由于目前online模型暂未适配C++，因此online识别部分由cpu通过onnx推理完成。(在原[FunASR](https://github.com/modelscope/FunASR)仓库运行bmodel/export_onnx.py可转出onnx模型)
 
 另有2pass.sh脚本用于本地测试在线识别服务。
