@@ -115,6 +115,7 @@ class CAMPPlus(torch.nn.Module):
                     torch.nn.init.zeros_(m.bias)
         """
         self.bmodel = EngineOV(kwargs["model_path"]+"/campplus_fp32_1b.bmodel", device_id=kwargs['dev_id'])
+        #self.bmodel = EngineOV(kwargs["model_path"]+"/campplus_fp16_1b.bmodel", device_id=kwargs['dev_id'])
 
     def forward(self, x):
         x = x.permute(0, 2, 1)  # (B,T,F) => (B,F,T)

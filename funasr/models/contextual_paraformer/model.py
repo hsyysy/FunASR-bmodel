@@ -83,9 +83,10 @@ class ContextualParaformer(Paraformer):
         self.crit_attn_smooth = crit_attn_smooth
 
         self.encoder_model = EngineOV(kwargs["model_path"]+"/encoder_fp32_1b.bmodel", device_id=kwargs['dev_id'])
-        #self.encoder_model = EngineOV(kwargs["model_path"]+"/encoder_bm1684x_f16_b10.bmodel", device_id=kwargs['dev_id'])
+        #self.encoder_model = EngineOV(kwargs["model_path"]+"/encoder_f16_1b.bmodel", device_id=kwargs['dev_id'])
 
         self.decoder_model = EngineOV(kwargs["model_path"]+"/decoder_fp32_1b.bmodel", device_id=kwargs['dev_id'])
+        #self.decoder_model = EngineOV(kwargs["model_path"]+"/decoder_fp16_1b.bmodel", device_id=kwargs['dev_id'])
         self.embedding_model = EngineOV(kwargs["model_path"]+"/embedding_fp32.bmodel", device_id=kwargs["dev_id"])
         self.lstm_model = EngineOV(kwargs["model_path"]+"/lstm_fp32.bmodel", device_id=kwargs["dev_id"])
 

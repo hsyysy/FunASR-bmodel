@@ -187,6 +187,7 @@ int main(int argc, char* argv[]) {
     int batch_size_ = batch_size.getValue();
 
     // Download model form Modelscope
+    /*
     try{
         std::string s_download_model_dir = download_model_dir.getValue();
 
@@ -443,6 +444,7 @@ int main(int argc, char* argv[]) {
     } catch (std::exception const& e) {
         LOG(ERROR) << "Error: " << e.what();
     }
+    */
 
     std::string s_listen_ip = listen_ip.getValue();
     int s_port = port.getValue();

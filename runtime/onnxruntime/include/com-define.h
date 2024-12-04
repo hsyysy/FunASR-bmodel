@@ -57,7 +57,7 @@ namespace funasr {
 #define VAD_CONFIG_NAME "config.yaml"
 
 // bmodels
-#define DEV_ID 5
+#define DEV_ID 0
 #define VAD_MODEL_NAME "fsmn_fp32.bmodel"
 #define VAD_F16_MODEL_NAME "fsmn_fp16.bmodel"
 #define PUNC_MODEL_NAME "punc_fp32.bmodel"
