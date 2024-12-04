@@ -1,4 +1,4 @@
-model_dir=./bmodel
+model_dir=../bmodel
 hub=$HOME/.cache/modelscope/hub
 target=BM1684X
 
@@ -14,7 +14,7 @@ itn_dir=${hub}/thuduj12/fst_itn_zh
 #quantize=true
 quantize=false
 
-./runtime/onnxruntime/build/bin/funasr-onnx-offline \
+../runtime/onnxruntime/build/bin/funasr-onnx-offline \
     --model-dir  ${model}    \
     --vad-dir    ${vad_dir}  \
     --punc-dir   ${punc_dir} \
@@ -23,8 +23,8 @@ quantize=false
     --punc-quant ${quantize} \
     --lm-dir     ${lm_dir} \
     --itn-dir    ${itn_dir} \
-    --wav-path ./audio/test_audio_20241017.wav
+    --wav-path ../audio/test_audio_20241017.wav
 
-    #--wav-path ./test_asr.wav
-    #--wav-path ./audio/test_audio_20241017.wav
-    #--wav-path ./audio/vad_example.wav
+    #--wav-path ../test_asr.wav
+    #--wav-path ../audio/test_audio_20241017.wav
+    #--wav-path ../audio/vad_example.wav

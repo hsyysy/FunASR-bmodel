@@ -1,4 +1,4 @@
-cd runtime/python/websocket
+cd ../runtime/python/websocket
 #python3 funasr_wss_client.py \
 python3 funasr_wss_client_with_id.py \
     --mode 2pass \
