@@ -4,4 +4,5 @@ def get_file_dev_id():
     dev_id = 5
     model_dir = "bmodel/"
     #model_dir = "iic/"
-    return file_path, dev_id, model_dir
+    target = "BM1684X"
+    return file_path, dev_id, model_dir, target

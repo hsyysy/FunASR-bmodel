@@ -10,7 +10,7 @@ from funasr.models.campplus.utils import postprocess, distribute_spk
 
 from process_0_info import get_file_dev_id
 
-file_path, _, _ = get_file_dev_id()
+file_path, _, _, _ = get_file_dev_id()
 
 filename = os.path.splitext(file_path)[0]
 

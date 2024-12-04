@@ -10,11 +10,11 @@ from funasr.models.campplus.utils import sv_chunk
 
 from process_0_info import get_file_dev_id
 
-file_path, dev_id, model_dir = get_file_dev_id()
+file_path, dev_id, model_dir, target = get_file_dev_id()
 
 filename = os.path.splitext(file_path)[0]
 
-model_spk = AutoModel(model=model_dir+"speech_campplus_sv_zh-cn_16k-common", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
+model_spk = AutoModel(model=model_dir+"speech_campplus_sv_zh-cn_16k-common/models/"+target, device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
 
 with open(filename+'_speechs.pkl', 'rb') as f:
     speechs = pickle.load(f)

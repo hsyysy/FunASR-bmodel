@@ -8,11 +8,11 @@ from funasr import AutoModel
 
 from process_0_info import get_file_dev_id
 
-file_path, dev_id, model_dir = get_file_dev_id()
+file_path, dev_id, model_dir, target = get_file_dev_id()
 
 filename = os.path.splitext(file_path)[0]
 
-model_punc = AutoModel(model=model_dir+"punc_ct-transformer_zh-cn-common-vocab272727-pytorch", device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
+model_punc = AutoModel(model=model_dir+"punc_ct-transformer_zh-cn-common-vocab272727/models/"+target, device="cpu", disable_update=True, disable_pbar=True, dev_id=dev_id)
 
 with open(filename+'_spk.pkl', 'rb') as f:
     result = pickle.load(f)
