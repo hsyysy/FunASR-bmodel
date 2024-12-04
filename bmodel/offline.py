@@ -8,7 +8,7 @@ import time
 import multiprocessing 
 
 file_path = "../audio/test_audio_20241017.wav"
-dev_id = 5
+dev_id = 0
 target = "BM1684X"
 
 # offline asr demo

@@ -10,8 +10,9 @@
     - [3.1 使用提供的模型](#31-使用提供的模型)
     - [3.2 编译模型](#32-编译模型)
   - [4.运行测试](#4-运行测试)
-    - [4.1 离线识别](#41-离线识别)
-    - [4.2 在线识别](#42-在线识别)
+    - [4.1 环境准备](#41-环境准备)
+    - [4.2 离线识别](#42-离线识别)
+    - [4.3 在线识别](#43-在线识别)
 
 ## 1. 简介
 
@@ -55,14 +56,29 @@ chmod -R +x scripts/
 
 ## 4. 运行测试
 
-### 4.1 离线识别
-Python离线识别可参考infer.py，在process_0_info.py中配置好音频文件路径，以及平台和设备ID后，即可执行推理。
+### 4.1 环境准备
+Python需要先安装tpu_perf, 在x86平台使用时算能计算卡（PCIE模式）时执行
+```bash
+pip3 install tpu_perf-1.2.35-py3-none-manylinux2014_x86_64.whl
+```
+在算能边缘计算盒子（SOC模式）上执行
+```bash
+tpu_perf-1.2.35-py3-none-manylinux2014_aarch64.whl
+```
+另外还需要安装外部依赖库
+```bash
+pip3 install -r requirements.txt
+```
+C++编译所需的外部库请参考对应readme.md文件。
+
+### 4.2 离线识别
+Python离线识别可参考offline.py，配置好音频文件路径，以及平台和设备ID后，即可执行推理。
 
 C++编译可参考[runtime/onnxruntime/readme.md](../runtime/onnxruntime/readme.md)编译，并用offline.sh测试运行。
 
 **注意：** 编译前需要在[com-define.h](../runtime/onnxruntime/include/com-define.h)文件中配置DEV_ID，即设备ID。
 
-### 4.2 在线识别
+### 4.3 在线识别
 Python在线识别可参考run_server.sh开启服务，通过run_client.sh测试
 
 C++编译可参考[runtime/websocket/readme.md](../runtime/websocket/readme_zh.md)编译，执行cpp_server.sh开启服务，通过cpp_client.sh测试，由于目前online模型暂未适配C++，因此online识别部分由cpu通过onnx推理完成。(在[原仓库](https://github.com/modelscope/FunASR)运行bmodel/export_onnx.py可转出onnx模型)
