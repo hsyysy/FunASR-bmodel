@@ -23,7 +23,7 @@ tar -xf tpu-mlir_v1.13.beta.0-20241203.tar.gz
 ./scripts/gen_fp32bmodel_embedding.sh bm1684x #bm1684x/bm1688
 ```
 
-​执行上述命令会在`models/BM1684X`等文件夹下生成对应的模型文件文件，即转换好的FP32 BModel。
+​执行上述命令会在`models/BM1684X`等文件夹下生成转换好的FP32 BModel文件。
 
 - 生成FP16 BModel
 
@@ -34,4 +34,4 @@ tar -xf tpu-mlir_v1.13.beta.0-20241203.tar.gz
 ./scripts/gen_fp16bmodel_decoder.sh bm1688 #bm1684x/bm1688
 ```
 
-​执行上述命令会在`models/BM1688/`等文件夹下生成对应的模型文件文件，即转换好的FP16 BModel。
+​执行上述命令会在`models/BM1688/`等文件夹下生成转换好的FP32 BModel文件。
