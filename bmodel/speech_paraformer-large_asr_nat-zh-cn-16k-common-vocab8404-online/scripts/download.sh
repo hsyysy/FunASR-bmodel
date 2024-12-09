@@ -16,10 +16,10 @@ pushd $scripts_dir
 # models
 if [ ! -d "../models" ]; then
     mkdir -p ../models
-    #python3 -m dfss --url=open@sophgo.com:sophon-demo/FunASR/${name}/onnx.zip
-    #unzip onnx.zip -d ../models
-    #rm onnx.zip
-    #echo "onnx download!"
+    python3 -m dfss --url=open@sophgo.com:sophon-demo/FunASR/${name}/onnx.zip
+    unzip onnx.zip -d ../models
+    rm onnx.zip
+    echo "onnx download!"
     python3 -m dfss --url=open@sophgo.com:sophon-demo/FunASR/${name}/BM1684X.zip
     unzip BM1684X.zip -d ../models
     rm BM1684X.zip
