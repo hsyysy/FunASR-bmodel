@@ -57,7 +57,7 @@ chmod -R +x scripts/
 ## 4. 运行测试
 
 ### 4.1 环境准备
-Python需要先安装tpu_perf, 在x86平台使用时算能计算卡（PCIE模式）时执行
+Python需要先安装tpu_perf, 在x86平台使用算能计算卡（PCIE模式）时执行
 ```bash
 pip3 install tpu_perf-1.2.35-py3-none-manylinux2014_x86_64.whl
 ```
