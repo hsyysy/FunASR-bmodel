@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-speech = torch.randn(1, 30, 560)
+speech = torch.randn(1, 10, 560)
 start_idx = torch.tensor([2000])
 chunk_size = torch.tensor([5, 10, 5])
 feats = torch.zeros((1, chunk_size[0] + chunk_size[2], 560))
