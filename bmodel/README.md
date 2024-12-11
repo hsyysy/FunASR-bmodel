@@ -63,7 +63,7 @@ pip3 install tpu_perf-1.2.35-py3-none-manylinux2014_x86_64.whl
 ```
 在算能边缘计算盒子（SOC模式）上执行
 ```bash
-tpu_perf-1.2.35-py3-none-manylinux2014_aarch64.whl
+pip3 install tpu_perf-1.2.35-py3-none-manylinux2014_aarch64.whl
 ```
 另外还需要安装外部依赖库
 ```bash
