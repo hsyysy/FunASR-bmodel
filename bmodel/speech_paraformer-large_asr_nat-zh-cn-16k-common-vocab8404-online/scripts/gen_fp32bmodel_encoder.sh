@@ -17,7 +17,7 @@ function gen_mlir()
     model_transform.py \
         --model_name ${name} \
         --model_def ../models/onnx/${name}.onnx \
-        --input_shapes [[1,10,560],[1],[3],[1,10,560]] \
+        --input_shapes [[1,20,560],[1],[3],[1,10,560]] \
         --test_input input_encoder.npz \
         --test_result ${name}_top_results.npz \
         --dynamic \

@@ -82,11 +82,11 @@ class ContextualParaformer(Paraformer):
             self.attn_loss = torch.nn.L1Loss()
         self.crit_attn_smooth = crit_attn_smooth
 
-        self.encoder_model = EngineOV(kwargs["model_path"]+"/encoder_fp32_1b.bmodel", device_id=kwargs['dev_id'])
-        #self.encoder_model = EngineOV(kwargs["model_path"]+"/encoder_f16_1b.bmodel", device_id=kwargs['dev_id'])
+        self.encoder_model = EngineOV(kwargs["model_path"]+"/encoder_fp32_10b.bmodel", device_id=kwargs['dev_id'])
+        #self.encoder_model = EngineOV(kwargs["model_path"]+"/encoder_f16_10b.bmodel", device_id=kwargs['dev_id'])
 
-        self.decoder_model = EngineOV(kwargs["model_path"]+"/decoder_fp32_1b.bmodel", device_id=kwargs['dev_id'])
-        #self.decoder_model = EngineOV(kwargs["model_path"]+"/decoder_fp16_1b.bmodel", device_id=kwargs['dev_id'])
+        self.decoder_model = EngineOV(kwargs["model_path"]+"/decoder_fp32_10b.bmodel", device_id=kwargs['dev_id'])
+        #self.decoder_model = EngineOV(kwargs["model_path"]+"/decoder_fp16_10b.bmodel", device_id=kwargs['dev_id'])
         self.embedding_model = EngineOV(kwargs["model_path"]+"/embedding_fp32.bmodel", device_id=kwargs["dev_id"])
         self.lstm_model = EngineOV(kwargs["model_path"]+"/lstm_fp32.bmodel", device_id=kwargs["dev_id"])
 
@@ -410,12 +410,12 @@ class ContextualParaformer(Paraformer):
         speech_lengths = speech_lengths.to(device=kwargs["device"])
 
         # hotword
-        """
-        self.hotword_list = self.generate_hotwords_list(
-            kwargs.get("hotword", None), tokenizer=tokenizer, frontend=frontend
-        )
-        """
-        self.hotword_list = None
+        if kwargs.get("hotword", None):
+            self.hotword_list = self.generate_hotwords_list(
+                kwargs.get("hotword", None), tokenizer=tokenizer, frontend=frontend
+            )
+        else:
+            self.hotword_list = None
 
         # Encoder
         """

@@ -17,7 +17,7 @@ function gen_mlir()
     model_transform.py \
         --model_name ${name} \
         --model_def ../models/onnx/${name}.onnx \
-        --input_shapes [[$1,2000,512],[$1],[$1,600,512],[$1],[$1,1,512]] \
+        --input_shapes [[$1,2000,512],[$1],[$1,600,512],[$1],[$1,100,512]] \
         --test_input ${name}_input_$1b.npz \
         --test_result ${name}_top_results.npz \
         --dynamic \
@@ -52,7 +52,7 @@ gen_mlir 1
 gen_fp16bmodel 1
 
 # batch_size=10
-#gen_mlir 10
-#gen_fp16bmodel 10
+gen_mlir 10
+gen_fp16bmodel 10
 
 popd

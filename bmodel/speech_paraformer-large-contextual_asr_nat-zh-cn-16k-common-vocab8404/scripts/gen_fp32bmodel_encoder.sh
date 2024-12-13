@@ -50,7 +50,7 @@ gen_mlir 1
 gen_fp32bmodel 1
 
 # batch_size=10
-#gen_mlir 10
-#gen_fp32bmodel 10
+gen_mlir 10
+gen_fp32bmodel 10
 
 popd
