@@ -18,7 +18,7 @@ Paraformer::Paraformer()
 }
 
 // bmrt
-void Paraformer::InitBmrt(const char* en_model, const char* em_model, const char* ls_model, const char* de_model, int dev_id){
+void Paraformer::InitBmrt(const char* en_model, const char* emb_file, const char* de_model, int dev_id){
     status = bm_dev_request(&bm_handle, dev_id);
     assert(BM_SUCCESS == status);
 
@@ -34,24 +34,11 @@ void Paraformer::InitBmrt(const char* en_model, const char* em_model, const char
     }
 
     try {
-        p_bmrt_offline_embedding = bmrt_create(bm_handle);
-        assert(NULL != p_bmrt_offline_embedding);
-        ret = bmrt_load_bmodel(p_bmrt_offline_embedding, em_model);
-        assert(true == ret);
-        LOG(INFO) << "Successfully load embedding model from " << em_model;
+        std::ifstream inFile(emb_file, std::ios::binary);
+        inFile.read(reinterpret_cast<char*>(hw_embed), sizeof(hw_embed));
+        inFile.close();
     } catch (std::exception const &e) {
-        LOG(ERROR) << "Error when load embedding bmodel: " << e.what();
-        exit(-1);
-    }
-
-    try {
-        p_bmrt_offline_lstm = bmrt_create(bm_handle);
-        assert(NULL != p_bmrt_offline_lstm);
-        ret = bmrt_load_bmodel(p_bmrt_offline_lstm, ls_model);
-        assert(true == ret);
-        LOG(INFO) << "Successfully load lstm model from " << ls_model;
-    } catch (std::exception const &e) {
-        LOG(ERROR) << "Error when load lstm bmodel: " << e.what();
+        LOG(ERROR) << "Error when load emb bin: " << e.what();
         exit(-1);
     }
 
@@ -84,10 +71,9 @@ void Paraformer::InitAsr(const std::string &am_model, const std::string &am_cmvn
     constexpr size_t ENCODER_MODEL_NAME_LENGTH = sizeof(ENCODER_MODEL_NAME) - 1;
     std::string model_dir = am_model.substr(0, am_model.size() - ENCODER_MODEL_NAME_LENGTH);
     std::string encoder_model = PathAppend(model_dir, ENCODER_MODEL_NAME);
-    std::string emb_model = PathAppend(model_dir, EMBEDDING_MODEL_NAME);
-    std::string lstm_model = PathAppend(model_dir, LSTM_MODEL_NAME);
     std::string decoder_model = PathAppend(model_dir, DECODER_MODEL_NAME);
-    InitBmrt(encoder_model.c_str(), emb_model.c_str(), lstm_model.c_str(), decoder_model.c_str(), DEV_ID);
+    std::string emb_file = PathAppend(model_dir, EMB_BIN_FILE);
+    InitBmrt(encoder_model.c_str(), emb_file.c_str(), decoder_model.c_str(), DEV_ID);
     /*
     // session_options_.SetInterOpNumThreads(1);
     session_options_.SetIntraOpNumThreads(thread_num);
@@ -199,10 +185,9 @@ void Paraformer::InitAsr(const std::string &am_model, const std::string &en_mode
     constexpr size_t ENCODER_MODEL_NAME_LENGTH = sizeof(ENCODER_MODEL_NAME) - 1;
     std::string model_dir = am_model.substr(0, am_model.size() - ENCODER_MODEL_NAME_LENGTH);
     std::string encoder_model = PathAppend(model_dir, ENCODER_MODEL_NAME);
-    std::string emb_model = PathAppend(model_dir, EMBEDDING_MODEL_NAME);
-    std::string lstm_model = PathAppend(model_dir, LSTM_MODEL_NAME);
     std::string decoder_model = PathAppend(model_dir, DECODER_MODEL_NAME);
-    InitBmrt(encoder_model.c_str(), emb_model.c_str(), lstm_model.c_str(), decoder_model.c_str(), DEV_ID);
+    std::string emb_file = PathAppend(model_dir, EMB_BIN_FILE);
+    InitBmrt(encoder_model.c_str(), emb_file.c_str(), decoder_model.c_str(), DEV_ID);
     /*
     try {
         m_session_ = std::make_unique<Ort::Session>(env_, ORTSTRING(am_model).c_str(), session_options_);
@@ -351,12 +336,6 @@ Paraformer::~Paraformer()
     }
     if(p_bmrt_offline_encoder){
         bmrt_destroy(p_bmrt_offline_encoder);
-    }
-    if(p_bmrt_offline_embedding){
-        bmrt_destroy(p_bmrt_offline_embedding);
-    }
-    if(p_bmrt_offline_lstm){
-        bmrt_destroy(p_bmrt_offline_lstm);
     }
     if(p_bmrt_offline_decoder){
         bmrt_destroy(p_bmrt_offline_decoder);
@@ -714,40 +693,14 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
             }
         }
 
-        // embedding
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_offline_embedding, &net_names);
-        int32_t value = 1;
-        bm_tensor_t input_tensors_embedding[1];
-        bmrt_tensor(&input_tensors_embedding[0], p_bmrt_offline_embedding, BM_INT32, {2, {1, 1}});
-        bm_tensor_t output_tensors_embedding[1];
-        bmrt_tensor(&output_tensors_embedding[0], p_bmrt_offline_embedding, BM_FLOAT32, {3, {1, 1, 512}});
-        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_embedding[0].device_mem, &value, sizeof(int32_t));
-
-        ret = bmrt_launch_tensor_ex(p_bmrt_offline_embedding, net_names[0], input_tensors_embedding, 1, output_tensors_embedding, 1, true, false);
-        assert(true == ret);
-        bm_thread_sync(bm_handle);
-
-        // lstm
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_offline_lstm, &net_names);
-        bm_tensor_t output_tensors_lstm[1];
-        bmrt_tensor(&output_tensors_lstm[0], p_bmrt_offline_lstm, BM_FLOAT32, {3, {1, 1, 512}});
-        ret = bmrt_launch_tensor_ex(p_bmrt_offline_lstm, net_names[0], output_tensors_embedding, 1, output_tensors_lstm, 1, true, false);
-        assert(true == ret);
-        bm_thread_sync(bm_handle);
-
-        float hw_embed[512];
-        output0size = bmrt_tensor_bytesize(&output_tensors_lstm[0]);
-        status = bm_memcpy_d2s_partial(bm_handle, hw_embed, output_tensors_lstm[0].device_mem, output0size);
-        assert(BM_SUCCESS == status);
-
+        /*
         float hw_embed2[512*batch_size];
         for (int i=0;i<batch_size;i++){
             for (int j=0;j<512;j++){
                 hw_embed2[512*i+j] = hw_embed[j];
             }
         }
+        */
 
         // decoder
         net_names = NULL;
@@ -769,7 +722,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         assert(BM_SUCCESS == status);
 
         bmrt_tensor(&input_tensors_decoder[4], p_bmrt_offline_decoder, BM_FLOAT32, {3, {batch_size, 1, 512}});
-        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[4].device_mem, hw_embed2, batch_size*512*sizeof(float));
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[4].device_mem, hw_embed, batch_size*512*sizeof(float));
         assert(BM_SUCCESS == status);
 
         bm_tensor_t output_tensors_decoder[1];
@@ -801,25 +754,6 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         }
         for (int i = 0; i < net_info->output_num; ++i) {
             bm_free_device(bm_handle, output_tensors_encoder[i].device_mem);
-        }
-        // free embedding
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_offline_embedding, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt_offline_embedding, net_names[0]);
-        assert(NULL != net_info);
-        for (int i = 0; i < net_info->input_num; ++i) {
-            bm_free_device(bm_handle, input_tensors_embedding[i].device_mem);
-        }
-        for (int i = 0; i < net_info->output_num; ++i) {
-            bm_free_device(bm_handle, output_tensors_embedding[i].device_mem);
-        }
-        // free lstm
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_offline_lstm, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt_offline_lstm, net_names[0]);
-        assert(NULL != net_info);
-        for (int i = 0; i < net_info->output_num; ++i) {
-            bm_free_device(bm_handle, output_tensors_lstm[i].device_mem);
         }
         // free decoder
         net_names = NULL;
