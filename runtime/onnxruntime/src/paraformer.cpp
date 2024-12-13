@@ -592,8 +592,9 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_encoder, net_names[0]);
         assert(NULL != net_info);
+
         // input tensor of encoder
-        bm_tensor_t input_tensors_encoder[2];
+        bm_tensor_t input_tensors_encoder[net_info->input_num];
 
         bmrt_tensor(&input_tensors_encoder[0], p_bmrt_offline_encoder, BM_FLOAT32, {3, {1, num_frames, feat_dim}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_encoder[0].device_mem, wav_feats.data(), wav_feats.size()*sizeof(float));
@@ -604,7 +605,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         assert(BM_SUCCESS == status);
 
         // output tensor of encoder
-        bm_tensor_t output_tensors_encoder[4];
+        bm_tensor_t output_tensors_encoder[net_info->output_num];
         /*
         for (int i=0;i<4;i++) {
             status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[i].device_mem, net_info->max_output_bytes[i]);
@@ -626,12 +627,14 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         bm_thread_sync(bm_handle);
 
         // encoder_out
+        /*
         auto encoder_out_size = bmrt_tensor_bytesize(&output_tensors_encoder[0]);
         auto encoder_out_shape = output_tensors_encoder[0].shape;
         auto encoder_out_count = bmrt_shape_count(&encoder_out_shape);
         float* encoder_out = new float[encoder_out_count];
         status = bm_memcpy_d2s_partial(bm_handle, encoder_out, output_tensors_encoder[0].device_mem, encoder_out_size);
         assert(BM_SUCCESS == status);
+        */
 
         // hidden
         auto output0size = bmrt_tensor_bytesize(&output_tensors_encoder[1]);
@@ -711,22 +714,25 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
             }
         }
 
+        // embedding
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_offline_embedding, &net_names);
         int32_t value = 1;
         bm_tensor_t input_tensors_embedding[1];
         bmrt_tensor(&input_tensors_embedding[0], p_bmrt_offline_embedding, BM_INT32, {2, {1, 1}});
         bm_tensor_t output_tensors_embedding[1];
         bmrt_tensor(&output_tensors_embedding[0], p_bmrt_offline_embedding, BM_FLOAT32, {3, {1, 1, 512}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_embedding[0].device_mem, &value, sizeof(int32_t));
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_offline_embedding, &net_names);
+
         ret = bmrt_launch_tensor_ex(p_bmrt_offline_embedding, net_names[0], input_tensors_embedding, 1, output_tensors_embedding, 1, true, false);
         assert(true == ret);
         bm_thread_sync(bm_handle);
 
-        bm_tensor_t output_tensors_lstm[1];
-        bmrt_tensor(&output_tensors_lstm[0], p_bmrt_offline_lstm, BM_FLOAT32, {3, {1, 1, 512}});
+        // lstm
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_lstm, &net_names);
+        bm_tensor_t output_tensors_lstm[1];
+        bmrt_tensor(&output_tensors_lstm[0], p_bmrt_offline_lstm, BM_FLOAT32, {3, {1, 1, 512}});
         ret = bmrt_launch_tensor_ex(p_bmrt_offline_lstm, net_names[0], output_tensors_embedding, 1, output_tensors_lstm, 1, true, false);
         assert(true == ret);
         bm_thread_sync(bm_handle);
@@ -743,19 +749,16 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
             }
         }
 
+        // decoder
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
         assert(NULL != net_info);
         bm_tensor_t input_tensors_decoder[5];
 
-        bmrt_tensor(&input_tensors_decoder[0], p_bmrt_offline_decoder, BM_FLOAT32, {3, {encoder_out_shape.dims[0], encoder_out_shape.dims[1], encoder_out_shape.dims[2]}});
-        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[0].device_mem, encoder_out, encoder_out_count*sizeof(float));
-        assert(BM_SUCCESS == status);
+        bmrt_tensor_with_device(&input_tensors_decoder[0], output_tensors_encoder[0].device_mem, BM_FLOAT32, {3, {batch_size, num_frames, 512}});
 
-        bmrt_tensor(&input_tensors_decoder[1], p_bmrt_offline_decoder, BM_INT32, {1, {batch_size}});
-        status = bm_memcpy_d2d(bm_handle, input_tensors_decoder[1].device_mem, 0, input_tensors_encoder[1].device_mem, 0, bmrt_tensor_bytesize(&input_tensors_encoder[1]));
-        assert(BM_SUCCESS == status);
+        bmrt_tensor_with_device(&input_tensors_decoder[1], input_tensors_encoder[1].device_mem, BM_INT32, {1, {batch_size}});
 
         bmrt_tensor(&input_tensors_decoder[2], p_bmrt_offline_decoder, BM_FLOAT32, {3, {batch_size, token_num_int, static_cast<int>(pre_acoustic_embeds[0][0].size())}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[2].device_mem, pre_acoustic_embeds2, pre_acoustic_embeds2_count*sizeof(float));
@@ -788,6 +791,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         auto decoder_out_vocab = decoder_out_shape.dims[2];
 
         // free device memory
+        // free encoder
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_encoder, net_names[0]);
@@ -798,6 +802,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         for (int i = 0; i < net_info->output_num; ++i) {
             bm_free_device(bm_handle, output_tensors_encoder[i].device_mem);
         }
+        // free embedding
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_embedding, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_embedding, net_names[0]);
@@ -808,6 +813,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         for (int i = 0; i < net_info->output_num; ++i) {
             bm_free_device(bm_handle, output_tensors_embedding[i].device_mem);
         }
+        // free lstm
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_lstm, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_lstm, net_names[0]);
@@ -815,11 +821,12 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         for (int i = 0; i < net_info->output_num; ++i) {
             bm_free_device(bm_handle, output_tensors_lstm[i].device_mem);
         }
+        // free decoder
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
         assert(NULL != net_info);
-        for (int i = 0; i < net_info->input_num; ++i) {
+        for (int i = 2; i < net_info->input_num; ++i) {
             bm_free_device(bm_handle, input_tensors_decoder[i].device_mem);
         }
         for (int i = 0; i < net_info->output_num; ++i) {

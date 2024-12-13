@@ -112,7 +112,7 @@ void FsmnVad::Forward(
     */
 
     // input tensor of vad
-    bm_tensor_t input_tensors_vad[5];
+    bm_tensor_t input_tensors_vad[net_info->input_num];
     bmrt_tensor(&input_tensors_vad[0], p_bmrt, BM_FLOAT32, {3, {1, num_frames, feature_dim}});
     status = bm_memcpy_s2d_partial(bm_handle, input_tensors_vad[0].device_mem, vad_feats.data(), vad_feats.size()*sizeof(float));
     assert(BM_SUCCESS == status);
@@ -122,8 +122,8 @@ void FsmnVad::Forward(
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_vad[i+1].device_mem, (*in_cache)[i].data(), (*in_cache)[i].size()*sizeof(float));
     }
     // output tensor of vad
-    bm_tensor_t output_tensors_vad[5];
-    for (int i=0;i<5;i++) {
+    bm_tensor_t output_tensors_vad[net_info->output_num];
+    for (int i=0;i<net_info->output_num;i++) {
         status = bm_malloc_device_byte(bm_handle, &output_tensors_vad[i].device_mem, net_info->max_output_bytes[i]);
         assert(BM_SUCCESS == status);
     }
