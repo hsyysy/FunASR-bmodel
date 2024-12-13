@@ -71,6 +71,11 @@ class ContextualParaformer(Paraformer):
             self.bias_embed = torch.nn.Embedding(self.vocab_size, inner_dim)
         else:
             logging.error("Unsupport bias encoder type: {}".format(bias_encoder_type))
+        self.bias_embed.weight                        = torch.load(kwargs["model_path"]+"/embedding_weight.pt")
+        self.bias_encoder._parameters['weight_ih_l0'] = torch.load(kwargs["model_path"]+"/weight_ih_l0.pt")
+        self.bias_encoder._parameters['weight_hh_l0'] = torch.load(kwargs["model_path"]+"/weight_hh_l0.pt")
+        self.bias_encoder._parameters['bias_ih_l0']   = torch.load(kwargs["model_path"]+"/bias_ih_l0.pt")
+        self.bias_encoder._parameters['bias_hh_l0']   = torch.load(kwargs["model_path"]+"/bias_hh_l0.pt")
 
         if self.target_buffer_length > 0:
             self.hotword_buffer = None
@@ -87,8 +92,6 @@ class ContextualParaformer(Paraformer):
 
         self.decoder_model = EngineOV(kwargs["model_path"]+"/decoder_fp32_10b.bmodel", device_id=kwargs['dev_id'])
         #self.decoder_model = EngineOV(kwargs["model_path"]+"/decoder_fp16_10b.bmodel", device_id=kwargs['dev_id'])
-        self.embedding_model = EngineOV(kwargs["model_path"]+"/embedding_fp32.bmodel", device_id=kwargs["dev_id"])
-        self.lstm_model = EngineOV(kwargs["model_path"]+"/lstm_fp32.bmodel", device_id=kwargs["dev_id"])
 
     def forward(
         self,
@@ -320,12 +323,8 @@ class ContextualParaformer(Paraformer):
             if self.use_decoder_embedding:
                 hw_embed = self.decoder.embed(hw_list_pad)
             else:
-                #hw_embed = self.bias_embed(hw_list_pad)
-                hw_embed_out = self.embedding_model([hw_list_pad.detach().numpy().astype('int32')])
-                hw_embed = torch.from_numpy(hw_embed_out[0])
-            #hw_embed, (h_n, _) = self.bias_encoder(hw_embed)
-            h_n_out = self.lstm_model([hw_embed.detach().numpy()])
-            h_n = torch.from_numpy(h_n_out[0])
+                hw_embed = self.bias_embed(hw_list_pad)
+            hw_embed, (h_n, _) = self.bias_encoder(hw_embed)
             hw_embed = h_n.repeat(encoder_out.shape[0], 1, 1)
         else:
             hw_lengths = [len(i) for i in hw_list]
