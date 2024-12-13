@@ -617,8 +617,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
 
         // hidden
         auto output0size = bmrt_tensor_bytesize(&output_tensors_encoder[1]);
-        auto output0shape = output_tensors_encoder[1].shape;
-        auto output0count = bmrt_shape_count(&output0shape);
+        auto output0count = bmrt_shape_count(&output_tensors_encoder[1].shape);
         auto output0 = new float[output0count];
         status = bm_memcpy_d2s_partial(bm_handle, output0, output_tensors_encoder[1].device_mem, output0size);
         assert(BM_SUCCESS == status);
@@ -636,11 +635,11 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
                 }
             }
         }
+        delete[] output0;
 
         // alphas
         output0size = bmrt_tensor_bytesize(&output_tensors_encoder[2]);
-        output0shape = output_tensors_encoder[2].shape;
-        output0count = bmrt_shape_count(&output0shape);
+        output0count = bmrt_shape_count(&output_tensors_encoder[2].shape);
         output0 = new float[output0count];
         status = bm_memcpy_d2s_partial(bm_handle, output0, output_tensors_encoder[2].device_mem, output0size);
         assert(BM_SUCCESS == status);
@@ -654,11 +653,11 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
                 alphas[b][t] = output0[b * time_steps + t];
             }
         }
+        delete[] output0;
 
         // pre_token_length
         output0size = bmrt_tensor_bytesize(&output_tensors_encoder[3]);
-        output0shape = output_tensors_encoder[3].shape;
-        output0count = bmrt_shape_count(&output0shape);
+        output0count = bmrt_shape_count(&output_tensors_encoder[3].shape);
         auto pre_token_length = new float[output0count];
         status = bm_memcpy_d2s_partial(bm_handle, pre_token_length, output_tensors_encoder[3].device_mem, output0size);
         assert(BM_SUCCESS == status);
@@ -673,6 +672,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
             long rounded_value = static_cast<long>(std::round(pre_token_length[i]));
             pre_token_length_rounded.push_back(rounded_value);
         }
+        delete[] pre_token_length;
 
         // before next bmodel
         auto cif_result = cif(hidden, alphas, 1.0f);
@@ -771,6 +771,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         if (input_finished) {
             result = FinalizeDecode(wfst_decoder);
         }
+        delete[] decoder_out;
 
         /*
         auto outputTensor = m_session_->Run(Ort::RunOptions{nullptr}, m_szInputNames.data(), input_onnx.data(), input_onnx.size(), m_szOutputNames.data(), m_szOutputNames.size());
