@@ -332,13 +332,13 @@ async def message(id):
         print(text_print)
         print(len(sent_timestamps))
         print(len(recv_timestamps))
-        with open("../../../record_text.txt","w") as f:
+        with open("../../../bmodel/record_text.txt","w") as f:
             f.write(text_print)
-        with open("../../../record_sent.txt","w") as f:
+        with open("../../../bmodel/record_sent.txt","w") as f:
             start_time = sent_timestamps[0][1]
             for item in sent_timestamps:
                 f.write(format(item[0],'04d')+" "+format(item[1]-start_time,'9.4f')+"\n")
-        with open("../../../record_recv.txt","w") as f:
+        with open("../../../bmodel/record_recv.txt","w") as f:
             for item in recv_timestamps:
                 f.write(format(item[0],'d')+" "+format(item[1],'04d')+" "+format(item[2],'04d')+" "+format(item[3]-start_time,'9.4f')+" "+item[4]+"\n")
 
