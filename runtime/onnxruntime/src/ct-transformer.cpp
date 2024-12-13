@@ -241,6 +241,7 @@ vector<int> CTTransformer::Infer(vector<int32_t> input_data)
             int index = Argmax(floatData + i, floatData + i + CANDIDATE_NUM-1);
             punction.push_back(index);
         }
+        delete[] floatData;
         // free device memory
         for (int i = 0; i < net_info->output_num; ++i) {
             bm_free_device(bm_handle, input_tensors_punc[i].device_mem);

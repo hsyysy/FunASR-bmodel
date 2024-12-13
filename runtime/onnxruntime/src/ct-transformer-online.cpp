@@ -225,7 +225,7 @@ vector<int> CTTransformerOnline::Infer(vector<int32_t> input_data, int nCacheSiz
     input_onnx.emplace_back(std::move(onnx_sub_mask));
     */
     // input tensor of punc
-    bm_tensor_t input_tensors_punc[2];
+    bm_tensor_t input_tensors_punc[net_info->input_num];
     bmrt_tensor(&input_tensors_punc[0], p_bmrt, BM_INT32, {2, {1, (int)input_data.size()}});
     status = bm_memcpy_s2d_partial(bm_handle, input_tensors_punc[0].device_mem, input_data.data(), input_data.size()*sizeof(int32_t));
     assert(BM_SUCCESS == status);
@@ -236,7 +236,7 @@ vector<int> CTTransformerOnline::Infer(vector<int32_t> input_data, int nCacheSiz
     assert(BM_SUCCESS == status);
 
     // output tensor of punc
-    bm_tensor_t output_tensors_punc[1];
+    bm_tensor_t output_tensors_punc[net_info->output_num];
     status = bm_malloc_device_byte(bm_handle, &output_tensors_punc[0].device_mem, net_info->max_output_bytes[0]);
     assert(BM_SUCCESS == status);
         
@@ -264,6 +264,7 @@ vector<int> CTTransformerOnline::Infer(vector<int32_t> input_data, int nCacheSiz
             int index = Argmax(floatData + i, floatData + i + CANDIDATE_NUM-1);
             punction.push_back(index);
         }
+        delete[] floatData;
         // free memory
         for (int i = 0; i < net_info->output_num; ++i) {
             bm_free_device(bm_handle, input_tensors_punc[i].device_mem);

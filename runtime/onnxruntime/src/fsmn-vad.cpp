@@ -166,6 +166,7 @@ void FsmnVad::Forward(
         memcpy((*out_prob)[i].data(), logp_data + i * output_dim,
                sizeof(float) * output_dim);
     }
+    delete[] logp_data;
   
     // get 4 caches outputs,each size is 128*19
     if(!is_final){
@@ -178,6 +179,7 @@ void FsmnVad::Forward(
         status = bm_memcpy_d2s_partial(bm_handle, data, output_tensors_vad[i].device_mem, cache_out_size);
         assert(BM_SUCCESS == status);
         memcpy((*in_cache)[i-1].data(), data, sizeof(float) * 128*19);
+        delete[] data;
         }
     }
     for (int i = 0; i < net_info->output_num; ++i) {
