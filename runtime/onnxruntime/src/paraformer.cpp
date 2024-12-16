@@ -18,7 +18,7 @@ Paraformer::Paraformer()
 }
 
 // bmrt
-void Paraformer::InitBmrt(const char* en_model, const char* emb_file, const char* de_model, int dev_id){
+void Paraformer::InitBmrt(const char* en_model, const char* de_model, int dev_id){
     status = bm_dev_request(&bm_handle, dev_id);
     assert(BM_SUCCESS == status);
 
@@ -30,15 +30,6 @@ void Paraformer::InitBmrt(const char* en_model, const char* emb_file, const char
         LOG(INFO) << "Successfully load encoder model from " << en_model;
     } catch (std::exception const &e) {
         LOG(ERROR) << "Error when load encoder bmodel: " << e.what();
-        exit(-1);
-    }
-
-    try {
-        std::ifstream inFile(emb_file, std::ios::binary);
-        inFile.read(reinterpret_cast<char*>(hw_embed), sizeof(hw_embed));
-        inFile.close();
-    } catch (std::exception const &e) {
-        LOG(ERROR) << "Error when load emb bin: " << e.what();
         exit(-1);
     }
 
@@ -72,8 +63,7 @@ void Paraformer::InitAsr(const std::string &am_model, const std::string &am_cmvn
     std::string model_dir = am_model.substr(0, am_model.size() - ENCODER_MODEL_NAME_LENGTH);
     std::string encoder_model = PathAppend(model_dir, ENCODER_MODEL_NAME);
     std::string decoder_model = PathAppend(model_dir, DECODER_MODEL_NAME);
-    std::string emb_file = PathAppend(model_dir, EMB_BIN_FILE);
-    InitBmrt(encoder_model.c_str(), emb_file.c_str(), decoder_model.c_str(), DEV_ID);
+    InitBmrt(encoder_model.c_str(), decoder_model.c_str(), DEV_ID);
     /*
     // session_options_.SetInterOpNumThreads(1);
     session_options_.SetIntraOpNumThreads(thread_num);
@@ -186,8 +176,7 @@ void Paraformer::InitAsr(const std::string &am_model, const std::string &en_mode
     std::string model_dir = am_model.substr(0, am_model.size() - ENCODER_MODEL_NAME_LENGTH);
     std::string encoder_model = PathAppend(model_dir, ENCODER_MODEL_NAME);
     std::string decoder_model = PathAppend(model_dir, DECODER_MODEL_NAME);
-    std::string emb_file = PathAppend(model_dir, EMB_BIN_FILE);
-    InitBmrt(encoder_model.c_str(), emb_file.c_str(), decoder_model.c_str(), DEV_ID);
+    InitBmrt(encoder_model.c_str(), decoder_model.c_str(), DEV_ID);
     /*
     try {
         m_session_ = std::make_unique<Ort::Session>(env_, ORTSTRING(am_model).c_str(), session_options_);
@@ -693,14 +682,10 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
             }
         }
 
-        /*
-        float hw_embed2[512*batch_size];
-        for (int i=0;i<batch_size;i++){
-            for (int j=0;j<512;j++){
-                hw_embed2[512*i+j] = hw_embed[j];
-            }
+        std::vector<float> hw_embed;
+        for (const auto& row : hw_emb) {
+            hw_embed.insert(hw_embed.end(), row.begin(), row.end());
         }
-        */
 
         // decoder
         net_names = NULL;
@@ -721,8 +706,8 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[3].device_mem, pre_token_length_rounded.data(), batch_size*sizeof(int32_t));
         assert(BM_SUCCESS == status);
 
-        bmrt_tensor(&input_tensors_decoder[4], p_bmrt_offline_decoder, BM_FLOAT32, {3, {batch_size, 1, 512}});
-        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[4].device_mem, hw_embed, batch_size*512*sizeof(float));
+        bmrt_tensor(&input_tensors_decoder[4], p_bmrt_offline_decoder, BM_FLOAT32, {3, {batch_size, static_cast<int>(hw_emb.size()), 512}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[4].device_mem, hw_embed.data(), batch_size*static_cast<int>(hw_emb.size())*512*sizeof(float));
         assert(BM_SUCCESS == status);
 
         bm_tensor_t output_tensors_decoder[1];

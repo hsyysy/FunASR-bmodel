@@ -64,7 +64,6 @@ namespace funasr {
 #define ENCODER_MODEL_NAME "encoder_fp32_1b.bmodel"
 #define ENCODER_F16_MODEL_NAME "encoder_fp16_10b.bmodel"
 #define DECODER_MODEL_NAME "decoder_fp32_1b.bmodel"
-#define EMB_BIN_FILE "hw_embed.bin"
 
 #define ENCODER_ONLINE_MODEL_NAME "encoder_fp32.bmodel"
 #define DECODER_ONLINE_MODEL_NAME "decoder_fp32_1b.bmodel"
