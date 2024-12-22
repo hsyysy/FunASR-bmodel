@@ -179,7 +179,7 @@ class DecoderLayerSANM(torch.nn.Module):
         return x, tgt_mask, memory, memory_mask, cache
 
     def forward_chunk(
-        self, tgt, memory, fsmn_cache=None, opt_cache=None, chunk_size=None, look_back=0
+        self, tgt, memory, fsmn_cache=None, opt_cache=None, chunk_size=None, look_back=0, ys_pad_lens=10
     ):
         """Compute decoded features.
 
@@ -207,7 +207,7 @@ class DecoderLayerSANM(torch.nn.Module):
         if self.self_attn:
             if self.normalize_before:
                 tgt = self.norm2(tgt)
-            x, fsmn_cache = self.self_attn(tgt, None, fsmn_cache)
+            x, fsmn_cache = self.self_attn(tgt, None, fsmn_cache, ys_pad_lens=ys_pad_lens)
             x = residual + self.dropout(x)
 
         if self.src_attn is not None:
@@ -463,6 +463,7 @@ class ParaformerSANMDecoder(BaseTransformerDecoder):
         memory: torch.Tensor,
         tgt: torch.Tensor,
         cache: dict = None,
+        ys_pad_lens=10,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward decoder.
 
@@ -505,6 +506,7 @@ class ParaformerSANMDecoder(BaseTransformerDecoder):
                 opt_cache=opt_cache[i],
                 chunk_size=cache["chunk_size"],
                 look_back=cache["decoder_chunk_look_back"],
+                ys_pad_lens=ys_pad_lens,
             )
 
         if self.num_blocks - self.att_layer_num > 1:

@@ -496,7 +496,7 @@ class MultiHeadedAttentionSANMDecoder(nn.Module):
         self.pad_fn = nn.ConstantPad1d((left_padding, right_padding), 0.0)
         self.kernel_size = kernel_size
 
-    def forward(self, inputs, mask, cache=None, mask_shfit_chunk=None):
+    def forward(self, inputs, mask, cache=None, mask_shfit_chunk=None, ys_pad_lens=10):
         """
         :param x: (#batch, time1, size).
         :param mask: Mask tensor (#batch, 1, time)
@@ -519,6 +519,7 @@ class MultiHeadedAttentionSANMDecoder(nn.Module):
 
         x = inputs.transpose(1, 2)
         b, d, t = x.size()
+        tt = ys_pad_lens#.squeeze()
         if cache is None:
             # print("in fsmn, cache is None, x", x.size())
 
@@ -531,7 +532,7 @@ class MultiHeadedAttentionSANMDecoder(nn.Module):
             # if t < self.kernel_size:
             #     x = self.pad_fn(x)
             x = torch.cat((cache[:, :, 1:], x), dim=2)
-            x = x[:, :, -(self.kernel_size + t - 1) :]
+            x = x[:, :, -(self.kernel_size + tt - 1) :]
             # print("in fsmn, cache is not None, x_cat", x.size())
             cache = x
         x = self.fsmn_block(x)

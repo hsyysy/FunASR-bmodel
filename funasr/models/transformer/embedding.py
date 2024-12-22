@@ -437,7 +437,7 @@ class StreamSinusoidalPositionEncoder(torch.nn.Module):
         batch_size, timesteps, input_dim = x.size()
         start_idx = 0
         if cache is not None:
-            start_idx = cache["start_idx"]
+            start_idx = cache["start_idx"].squeeze() # for export paraformer streaming encoder
             cache["start_idx"] += timesteps
         positions = torch.arange(1, timesteps + start_idx + 1)[None, :]
         position_encoding = self.encode(positions, input_dim, x.dtype).to(x.device)

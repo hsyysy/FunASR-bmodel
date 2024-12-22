@@ -660,3 +660,118 @@ class ParaformerStreaming(Paraformer):
 
         models = export_rebuild_model(model=self, **kwargs)
         return models
+
+@tables.register("model_classes", "ParaformerStreamingEncoder")
+class ParaformerStreamingEncoder(Paraformer):
+    """
+    Author: Speech Lab of DAMO Academy, Alibaba Group
+    Paraformer: Fast and Accurate Parallel Transformer for Non-autoregressive End-to-End Speech Recognition
+    https://arxiv.org/abs/2206.08317
+    """
+
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+
+        super().__init__(*args, **kwargs)
+
+        # import pdb;
+        # pdb.set_trace()
+        self.sampling_ratio = kwargs.get("sampling_ratio", 0.2)
+        self.scama_mask = None
+        if hasattr(self.encoder, "overlap_chunk_cls") and self.encoder.overlap_chunk_cls is not None:
+            from funasr.models.scama.chunk_utilis import build_scama_mask_for_cross_attention_decoder
+            self.build_scama_mask_for_cross_attention_decoder_fn = build_scama_mask_for_cross_attention_decoder
+            self.decoder_attention_chunk_type = kwargs.get("decoder_attention_chunk_type", "chunk")
+
+    def forward(
+        self,
+        speech,
+        cache=None,
+        is_final=False
+        ):
+
+        speech_lengths = torch.tensor([speech.size(1)])
+        # Encoder
+        encoder_out, encoder_out_lens = self.encode_chunk(speech, speech_lengths, cache=cache)
+        if isinstance(encoder_out, tuple):
+            encoder_out = encoder_out[0]
+        return encoder_out, cache['encoder']['start_idx'], cache['encoder']['feats']
+
+    def encode_chunk(
+        self, speech: torch.Tensor, speech_lengths: torch.Tensor, cache: dict = None, **kwargs,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Frontend + Encoder. Note that this method is used by asr_inference.py
+        Args:
+                speech: (Batch, Length, ...)
+                speech_lengths: (Batch, )
+                ind: int
+        """
+        with autocast(False):
+
+            # Data augmentation
+            if self.specaug is not None and self.training:
+                speech, speech_lengths = self.specaug(speech, speech_lengths)
+
+            # Normalization for feature: e.g. Global-CMVN, Utterance-CMVN
+            if self.normalize is not None:
+                speech, speech_lengths = self.normalize(speech, speech_lengths)
+
+        # Forward encoder
+        encoder_out, encoder_out_lens, _ = self.encoder.forward_chunk(speech, speech_lengths, cache=cache["encoder"])
+        if isinstance(encoder_out, tuple):
+            encoder_out = encoder_out[0]
+
+        return encoder_out, torch.tensor([encoder_out.size(1)])
+
+@tables.register("model_classes", "ParaformerStreamingDecoder")
+class ParaformerStreamingDecoder(Paraformer):
+    """
+    Author: Speech Lab of DAMO Academy, Alibaba Group
+    Paraformer: Fast and Accurate Parallel Transformer for Non-autoregressive End-to-End Speech Recognition
+    https://arxiv.org/abs/2206.08317
+    """
+
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+
+        super().__init__(*args, **kwargs)
+
+        # import pdb;
+        # pdb.set_trace()
+        self.sampling_ratio = kwargs.get("sampling_ratio", 0.2)
+        self.scama_mask = None
+        if hasattr(self.encoder, "overlap_chunk_cls") and self.encoder.overlap_chunk_cls is not None:
+            from funasr.models.scama.chunk_utilis import build_scama_mask_for_cross_attention_decoder
+            self.build_scama_mask_for_cross_attention_decoder_fn = build_scama_mask_for_cross_attention_decoder
+            self.decoder_attention_chunk_type = kwargs.get("decoder_attention_chunk_type", "chunk")
+    def forward(self,
+                        encoder_out,
+                        encoder_out_lens,
+                        pre_acoustic_embeds,
+                        pre_token_length,
+                        cache=None,
+                        is_final=False):
+
+        decoder_outs = self.cal_decoder_with_predictor_chunk(encoder_out,
+                                                             encoder_out_lens,
+                                                             pre_acoustic_embeds,
+                                                             pre_token_length,
+                                                             cache=cache
+                                                             )
+        decoder_out, ys_pad_lens = decoder_outs[0], decoder_outs[1]
+        return decoder_out, cache['decoder']['decode_fsmn']
+
+    def cal_decoder_with_predictor_chunk(self, encoder_out, encoder_out_lens, sematic_embeds, ys_pad_lens, cache=None):
+        print("ys_pad_lens:",ys_pad_lens)
+        decoder_outs = self.decoder.forward_chunk(
+            encoder_out, sematic_embeds, cache["decoder"], ys_pad_lens=ys_pad_lens
+        )
+        decoder_out = decoder_outs
+        decoder_out = torch.log_softmax(decoder_out, dim=-1)
+        return decoder_out, ys_pad_lens
