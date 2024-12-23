@@ -93,10 +93,6 @@ namespace funasr {
         // lm
         std::shared_ptr<fst::Fst<fst::StdArc>> lm_ = nullptr;
 
-        // bmrt
-        void* p_bmrt_online_encoder;
-        void* p_bmrt_online_decoder;
-
         string window_type = "hamming";
         int frame_length = 25;
         int frame_shift = 10;

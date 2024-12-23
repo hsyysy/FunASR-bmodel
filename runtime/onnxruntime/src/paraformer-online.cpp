@@ -11,7 +11,7 @@ namespace funasr {
 
 ParaformerOnline::ParaformerOnline(Model* offline_handle, std::vector<int> chunk_size, std::string model_type)
 :offline_handle_(std::move(offline_handle)),chunk_size(chunk_size),session_options_{}{
-    if(model_type == MODEL_PARA){
+    //if(model_type == MODEL_PARA){
         Paraformer* para_handle = dynamic_cast<Paraformer*>(offline_handle_);
         InitOnline(
         para_handle->fbank_opts_,
@@ -34,12 +34,13 @@ ParaformerOnline::ParaformerOnline(Model* offline_handle, std::vector<int> chunk
         para_handle->fsmn_dims,
         para_handle->cif_threshold,
         para_handle->tail_alphas);
+        /*
     }else if(model_type == MODEL_SVS){
         SenseVoiceSmall* svs_handle = dynamic_cast<SenseVoiceSmall*>(offline_handle_);
         InitOnline(
         svs_handle->fbank_opts_,
-        svs_handle->p_bmrt_online_encoder,
-        svs_handle->p_bmrt_online_decoder,
+        svs_handle->encoder_session_,
+        svs_handle->decoder_session_,
         svs_handle->en_szInputNames_,
         svs_handle->en_szOutputNames_,
         svs_handle->de_szInputNames_,
@@ -58,6 +59,7 @@ ParaformerOnline::ParaformerOnline(Model* offline_handle, std::vector<int> chunk
         svs_handle->cif_threshold,
         svs_handle->tail_alphas);
     }
+    */
     InitCache();
 }
 
@@ -85,16 +87,18 @@ void ParaformerOnline::InitOnline(
         float cif_threshold_,
         float tail_alphas_){
     fbank_opts_ = fbank_opts;
-    //encoder_session_ = encoder_session;
-    p_bmrt_online_encoder = p_bmrt_online_encoder_;
-    //decoder_session_ = decoder_session;
-    p_bmrt_online_decoder = p_bmrt_online_decoder_;
+    /*
+    encoder_session_ = encoder_session;
+    decoder_session_ = decoder_session;
     en_szInputNames_ = en_szInputNames;
     en_szOutputNames_ = en_szOutputNames;
     de_szInputNames_ = de_szInputNames;
     de_szOutputNames_ = de_szOutputNames;
+    */
     means_list_ = means_list;
     vars_list_ = vars_list;
+    p_bmrt_online_encoder = p_bmrt_online_encoder_;
+    p_bmrt_online_decoder = p_bmrt_online_decoder_;
     bm_handle = (bm_handle_t)bmrt_get_bm_handle(p_bmrt_online_encoder);
 
     frame_length = frame_length_;
