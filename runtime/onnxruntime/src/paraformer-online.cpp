@@ -15,8 +15,8 @@ ParaformerOnline::ParaformerOnline(Model* offline_handle, std::vector<int> chunk
         Paraformer* para_handle = dynamic_cast<Paraformer*>(offline_handle_);
         InitOnline(
         para_handle->fbank_opts_,
-        para_handle->encoder_session_,
-        para_handle->decoder_session_,
+        para_handle->p_bmrt_online_encoder,
+        para_handle->p_bmrt_online_decoder,
         para_handle->en_szInputNames_,
         para_handle->en_szOutputNames_,
         para_handle->de_szInputNames_,
@@ -38,8 +38,8 @@ ParaformerOnline::ParaformerOnline(Model* offline_handle, std::vector<int> chunk
         SenseVoiceSmall* svs_handle = dynamic_cast<SenseVoiceSmall*>(offline_handle_);
         InitOnline(
         svs_handle->fbank_opts_,
-        svs_handle->encoder_session_,
-        svs_handle->decoder_session_,
+        svs_handle->p_bmrt_online_encoder,
+        svs_handle->p_bmrt_online_decoder,
         svs_handle->en_szInputNames_,
         svs_handle->en_szOutputNames_,
         svs_handle->de_szInputNames_,
@@ -63,8 +63,10 @@ ParaformerOnline::ParaformerOnline(Model* offline_handle, std::vector<int> chunk
 
 void ParaformerOnline::InitOnline(
         knf::FbankOptions &fbank_opts,
-        std::shared_ptr<Ort::Session> &encoder_session,
-        std::shared_ptr<Ort::Session> &decoder_session,
+        //std::shared_ptr<Ort::Session> &encoder_session,
+        void* &p_bmrt_online_encoder_,
+        //std::shared_ptr<Ort::Session> &decoder_session,
+        void* &p_bmrt_online_decoder_,
         vector<const char*> &en_szInputNames,
         vector<const char*> &en_szOutputNames,
         vector<const char*> &de_szInputNames,
@@ -83,14 +85,17 @@ void ParaformerOnline::InitOnline(
         float cif_threshold_,
         float tail_alphas_){
     fbank_opts_ = fbank_opts;
-    encoder_session_ = encoder_session;
-    decoder_session_ = decoder_session;
+    //encoder_session_ = encoder_session;
+    p_bmrt_online_encoder = p_bmrt_online_encoder_;
+    //decoder_session_ = decoder_session;
+    p_bmrt_online_decoder = p_bmrt_online_decoder_;
     en_szInputNames_ = en_szInputNames;
     en_szOutputNames_ = en_szOutputNames;
     de_szInputNames_ = de_szInputNames;
     de_szOutputNames_ = de_szOutputNames;
     means_list_ = means_list;
     vars_list_ = vars_list;
+    bm_handle = (bm_handle_t)bmrt_get_bm_handle(p_bmrt_online_encoder);
 
     frame_length = frame_length_;
     frame_shift = frame_shift_;
@@ -352,7 +357,8 @@ void ParaformerOnline::InitCache(){
     hidden_cache_.clear();
     alphas_cache_.clear();
     feats_cache_.clear();
-    decoder_onnx.clear();
+    //decoder_onnx.clear();
+    decoder_cache.clear();
 
     // cif cache
     std::vector<float> hidden_cache(encoder_size, 0);
@@ -373,6 +379,7 @@ void ParaformerOnline::InitCache(){
 #endif
     const int64_t fsmn_shape_[3] = {1, fsmn_dims, fsmn_lorder};
     for(int l=0; l<fsmn_layers; l++){
+        /*
         Ort::Value onnx_fsmn_cache = Ort::Value::CreateTensor<float>(
             m_memoryInfo,
             fsmn_init_cache_.data(),
@@ -380,6 +387,8 @@ void ParaformerOnline::InitCache(){
             fsmn_shape_,
             3);
         decoder_onnx.emplace_back(std::move(onnx_fsmn_cache));
+        */
+        decoder_cache.emplace_back(std::move(fsmn_init_cache_.data()));
     }
 };
 
@@ -428,6 +437,7 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
         for (const auto &chunk_feat: chunk_feats) {
             wav_feats.insert(wav_feats.end(), chunk_feat.begin(), chunk_feat.end());
         }
+        /*
         Ort::Value onnx_feats = Ort::Value::CreateTensor<float>(
             m_memoryInfo,
             wav_feats.data(),
@@ -444,10 +454,53 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
         std::vector<Ort::Value> input_onnx;
         input_onnx.emplace_back(std::move(onnx_feats));
         input_onnx.emplace_back(std::move(onnx_feats_len)); 
+        */
+
+        // bmrt
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_online_encoder, &net_names);
+        net_info = bmrt_get_network_info(p_bmrt_online_encoder, net_names[0]);
+        assert(NULL != net_info);
+        // input tensor of encoder
+        bm_tensor_t input_tensors_encoder[net_info->input_num];
+        bmrt_tensor(&input_tensors_encoder[0], p_bmrt_online_encoder, net_info->input_dtypes[0], {3, {1, num_frames, feat_dims}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_encoder[0].device_mem, wav_feats.data(), wav_feats.size()*sizeof(float));
+        assert(BM_SUCCESS == status);
+
+        bmrt_tensor(&input_tensors_encoder[1], p_bmrt_online_encoder, net_info->input_dtypes[1], {1, {1}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_encoder[1].device_mem, &num_frames, sizeof(int32_t));
+        assert(BM_SUCCESS == status);
+
+        // output tensor of encoder
+        bm_tensor_t output_tensors_encoder[net_info->output_num];
+        for (int i=0;i<net_info->output_num;i++) {
+            status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[i].device_mem, net_info->max_output_bytes[i]);
+            assert(BM_SUCCESS == status);
+        }
+
+        // forward
+        ret = bmrt_launch_tensor_ex(p_bmrt_online_encoder, net_names[0], input_tensors_encoder, net_info->input_num, output_tensors_encoder, net_info->output_num, true, false);
+        assert(true == ret);
+        bm_thread_sync(bm_handle);
         
-        auto encoder_tensor = encoder_session_->Run(Ort::RunOptions{nullptr}, en_szInputNames_.data(), input_onnx.data(), input_onnx.size(), en_szOutputNames_.data(), en_szOutputNames_.size());
+        //auto encoder_tensor = encoder_session_->Run(Ort::RunOptions{nullptr}, en_szInputNames_.data(), input_onnx.data(), input_onnx.size(), en_szOutputNames_.data(), en_szOutputNames_.size());
+
+        auto enc_shape = output_tensors_encoder[0].shape;
+        auto enc_count = bmrt_shape_count(&enc_shape);
+        std::vector<float> enc_data;
+        enc_data.reserve(enc_count);
+        status = bm_memcpy_d2s_partial(bm_handle, enc_data.data(), output_tensors_encoder[0].device_mem, bmrt_tensor_bytesize(&output_tensors_encoder[0]));
+        assert(BM_SUCCESS == status);
+
+        auto alpha_shape = output_tensors_encoder[1].shape;
+        auto alpha_count = bmrt_shape_count(&alpha_shape);
+        std::vector<float> alpha_vec;
+        alpha_vec.resize(alpha_count);
+        status = bm_memcpy_d2s_partial(bm_handle, alpha_vec.data(), output_tensors_encoder[1].device_mem, bmrt_tensor_bytesize(&output_tensors_encoder[1]));
+        assert(BM_SUCCESS == status);
 
         // get enc_vec
+        /*
         std::vector<int64_t> enc_shape = encoder_tensor[0].GetTensorTypeAndShapeInfo().GetShape();
         float* enc_data = encoder_tensor[0].GetTensorMutableData<float>();
         std::vector<std::vector<float>> enc_vec(enc_shape[1], std::vector<float>(enc_shape[2]));
@@ -456,31 +509,61 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
                 enc_vec[i][j] = enc_data[i * enc_shape[2] + j];
             }
         }
+        */
+        std::vector<std::vector<float>> enc_vec(enc_shape.dims[1], std::vector<float>(enc_shape.dims[2]));
+        for (int i = 0; i < enc_shape.dims[1]; i++) {
+            for (int j = 0; j < enc_shape.dims[2]; j++) {
+                enc_vec[i][j] = enc_data[i * enc_shape.dims[2] + j];
+            }
+        }
 
         // get alpha_vec
+        /*
         std::vector<int64_t> alpha_shape = encoder_tensor[2].GetTensorTypeAndShapeInfo().GetShape();
         float* alpha_data = encoder_tensor[2].GetTensorMutableData<float>();
         std::vector<float> alpha_vec(alpha_shape[1]);
         for (int i = 0; i < alpha_shape[1]; i++) {
             alpha_vec[i] = alpha_data[i];
         } 
+        */
 
         std::vector<std::vector<float>> list_frame;
         CifSearch(enc_vec, alpha_vec, input_finished, list_frame);
 
         
         if(list_frame.size()>0){
+            /*
+            std::vector<int64_t> shape = {enc_shape.dims[0], enc_shape.dims[1], enc_shape.dims[2]};
+            Ort::Value decoder_input0 = Ort::Value::CreateTensor<float>(
+                m_memoryInfo,
+                enc_data.data(),
+                enc_count,
+                shape.data(),
+                shape.size()
+            );
             // enc
-            decoder_onnx.insert(decoder_onnx.begin(), std::move(encoder_tensor[0]));
+            //decoder_onnx.insert(decoder_onnx.begin(), std::move(encoder_tensor[0]));
+            decoder_onnx.insert(decoder_onnx.begin(), std::move(decoder_input0));
+
+            const int64_t encoder_length_shape[1] = {1};
+            std::vector<int32_t> encoder_length(1, enc_shape.dims[1]);
+            Ort::Value decoder_input1 = Ort::Value::CreateTensor<int32_t>(
+                m_memoryInfo,
+                encoder_length.data(),
+                encoder_length.size(),
+                encoder_length_shape, 1);
             // enc_lens
-            decoder_onnx.insert(decoder_onnx.begin()+1, std::move(encoder_tensor[1]));
+            //decoder_onnx.insert(decoder_onnx.begin()+1, std::move(encoder_tensor[1]));
+            decoder_onnx.insert(decoder_onnx.begin()+1, std::move(decoder_input1));
 
             // acoustic_embeds
             const int64_t emb_shape_[3] = {1, (int64_t)list_frame.size(), (int64_t)list_frame[0].size()};
+            */
             std::vector<float> emb_input;
             for (const auto &list_frame_: list_frame) {
                 emb_input.insert(emb_input.end(), list_frame_.begin(), list_frame_.end());
             }
+            /*
             Ort::Value onnx_emb = Ort::Value::CreateTensor<float>(
                 m_memoryInfo,
                 emb_input.data(),
@@ -491,28 +574,102 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
 
             // acoustic_embeds_len
             const int64_t emb_length_shape[1] = {1};
+            */
             std::vector<int32_t> emb_length;
             emb_length.emplace_back(list_frame.size());
+            /*
             Ort::Value onnx_emb_len = Ort::Value::CreateTensor<int32_t>(
                 m_memoryInfo, emb_length.data(), emb_length.size(), emb_length_shape, 1);
             decoder_onnx.insert(decoder_onnx.begin()+3, std::move(onnx_emb_len));
+            */
 
-            auto decoder_tensor = decoder_session_->Run(Ort::RunOptions{nullptr}, de_szInputNames_.data(), decoder_onnx.data(), decoder_onnx.size(), de_szOutputNames_.data(), de_szOutputNames_.size());
+            //bmrt
+            net_names = NULL;
+            bmrt_get_network_names(p_bmrt_online_decoder, &net_names);
+            net_info = bmrt_get_network_info(p_bmrt_online_decoder, net_names[0]);
+            assert(NULL != net_info);
+            // input tensor of decoder
+            bm_tensor_t input_tensors_decoder[net_info->input_num];
+
+            bmrt_tensor(&input_tensors_decoder[0], p_bmrt_online_decoder, net_info->input_dtypes[0], {3, {enc_shape.dims[0], enc_shape.dims[1], enc_shape.dims[2]}});
+            status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[0].device_mem, enc_data.data(), enc_count*sizeof(float));
+            assert(BM_SUCCESS == status);
+
+            bmrt_tensor(&input_tensors_decoder[1], p_bmrt_online_decoder, net_info->input_dtypes[1], {1, {1}});
+            status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[1].device_mem, &enc_shape.dims[1], 1*sizeof(int));
+            assert(BM_SUCCESS == status);
+
+            bmrt_tensor(&input_tensors_decoder[2], p_bmrt_online_decoder, net_info->input_dtypes[2], {3, {1, static_cast<int>(list_frame.size()), static_cast<int>(list_frame[0].size())}});
+            status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[2].device_mem, emb_input.data(), emb_input.size()*sizeof(float));
+            assert(BM_SUCCESS == status);
+
+            bmrt_tensor(&input_tensors_decoder[3], p_bmrt_online_decoder, net_info->input_dtypes[3], {1, {1}});
+            status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[3].device_mem, emb_length.data() ,sizeof(int32_t));
+            assert(BM_SUCCESS == status);
+
+            for (int i=0;i<16;i++){
+                bmrt_tensor(&input_tensors_decoder[i+4], p_bmrt_online_decoder, net_info->input_dtypes[i+4], {3, {1,512,10}});
+                status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[i+4].device_mem, decoder_cache[i], 5120*sizeof(float));
+                assert(BM_SUCCESS == status);
+            }
+            // output tensor of decoder
+            bm_tensor_t output_tensors_decoder[net_info->output_num];
+            for (int i=0;i<net_info->output_num;i++) {
+                status = bm_malloc_device_byte(bm_handle, &output_tensors_decoder[i].device_mem, net_info->max_output_bytes[i]);
+                assert(BM_SUCCESS == status);
+            }
+
+            // forward
+            ret = bmrt_launch_tensor_ex(p_bmrt_online_decoder, net_names[0], input_tensors_decoder, net_info->input_num, output_tensors_decoder, net_info->output_num, true, false);
+            assert(true == ret);
+            bm_thread_sync(bm_handle);
+
+            auto decoder_out_shape = output_tensors_decoder[0].shape;
+            auto decoder_out_count = bmrt_shape_count(&decoder_out_shape);
+            std::vector<float> float_data;
+            float_data.resize(decoder_out_count);
+            status = bm_memcpy_d2s_partial(bm_handle, float_data.data(), output_tensors_decoder[0].device_mem, bmrt_tensor_bytesize(&output_tensors_decoder[0]));
+            assert(BM_SUCCESS == status);
+
+            //auto decoder_tensor = decoder_session_->Run(Ort::RunOptions{nullptr}, de_szInputNames_.data(), decoder_onnx.data(), decoder_onnx.size(), de_szOutputNames_.data(), de_szOutputNames_.size());
             // fsmn cache
             try{
-                decoder_onnx.clear();
+                //decoder_onnx.clear();
+                decoder_cache.clear();
             }catch (std::exception const &e)
             {
                 LOG(ERROR)<<e.what();
                 return result;
             }
             for(int l=0;l<fsmn_layers;l++){
-                decoder_onnx.emplace_back(std::move(decoder_tensor[2+l]));
+                status = bm_memcpy_d2s_partial(bm_handle, decoder_cache[l], output_tensors_decoder[l+2].device_mem, bmrt_tensor_bytesize(&output_tensors_decoder[2+l]));
+                assert(BM_SUCCESS == status);
+                //decoder_onnx.emplace_back(std::move(decoder_tensor[2+l]));
             }
 
+            /*
             std::vector<int64_t> decoder_shape = decoder_tensor[0].GetTensorTypeAndShapeInfo().GetShape();
             float* float_data = decoder_tensor[0].GetTensorMutableData<float>();
             result = offline_handle_->GreedySearch(float_data, list_frame.size(), decoder_shape[2]);
+            */
+            result = offline_handle_->GreedySearch(float_data.data(), list_frame.size(), decoder_out_shape.dims[2]);
+
+            for (int i = 0; i < net_info->input_num; ++i) {
+                bm_free_device(bm_handle, input_tensors_decoder[i].device_mem);
+            }
+            for (int i = 0; i < net_info->output_num; ++i) {
+                bm_free_device(bm_handle, output_tensors_decoder[i].device_mem);
+            }
+            net_names = NULL;
+            bmrt_get_network_names(p_bmrt_online_encoder, &net_names);
+            net_info = bmrt_get_network_info(p_bmrt_online_encoder, net_names[0]);
+            assert(NULL != net_info);
+            for (int i = 0; i < net_info->input_num; ++i) {
+                bm_free_device(bm_handle, input_tensors_encoder[i].device_mem);
+            }
+            for (int i = 0; i < net_info->output_num; ++i) {
+                bm_free_device(bm_handle, output_tensors_encoder[i].device_mem);
+            }
         }
     }catch (std::exception const &e)
     {

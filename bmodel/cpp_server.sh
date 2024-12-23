@@ -3,11 +3,9 @@ target=BM1684X
 
 # bmodel
 model=speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404/models/$target
+online_model=speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online/models/$target
 vad_dir=speech_fsmn_vad_zh-cn-16k-common/models/$target
 punc_dir=punc_ct-transformer_zh-cn-common-vocab272727/models/$target
-
-# onnx model
-online_model=${hub}/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online
 
 # other model
 lm_dir=${hub}/iic/speech_ngram_lm_zh-cn-ai-wesp-fst

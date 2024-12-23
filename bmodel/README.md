@@ -45,7 +45,7 @@ chmod -R +x scripts/
 |  模型名称  |  Python  | C++ |
 |------------|----------|-----|
 |[speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404](speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404)|支持|支持|
-|[speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online](speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online)|支持|不支持|
+|[speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online](speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online)|支持|支持|
 |[speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404](speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404)|支持|不支持|
 |[speech_fsmn_vad_zh-cn-16k-common](speech_fsmn_vad_zh-cn-16k-common)|支持|支持|
 |[punc_ct-transformer_zh-cn-common-vocab272727](punc_ct-transformer_zh-cn-common-vocab272727)|支持|支持|

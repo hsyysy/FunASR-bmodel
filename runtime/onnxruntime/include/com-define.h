@@ -64,9 +64,10 @@ namespace funasr {
 #define ENCODER_MODEL_NAME "encoder_fp32_1b.bmodel"
 #define ENCODER_F16_MODEL_NAME "encoder_fp16_10b.bmodel"
 #define DECODER_MODEL_NAME "decoder_fp32_1b.bmodel"
+#define BMODEL_EB_NAME "eb_fp32.bmodel"
 
-#define ENCODER_ONLINE_MODEL_NAME "encoder_fp32.bmodel"
-#define DECODER_ONLINE_MODEL_NAME "decoder_fp32_1b.bmodel"
+#define ENCODER_ONLINE_MODEL_NAME "model_fp32.bmodel"
+#define DECODER_ONLINE_MODEL_NAME "decoder_fp32.bmodel"
 
 // gpu models
 #define INFER_GPU "gpu"

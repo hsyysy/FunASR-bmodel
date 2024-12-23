@@ -24,6 +24,7 @@ quantize=false
     --itn-dir    ${itn_dir} \
     --wav-path ../audio/test_audio_20241017.wav
 
+    #--hotword hotwords.txt \
     #--wav-path ../test_asr.wav
     #--wav-path ../audio/test_audio_20241017.wav
     #--wav-path ../audio/vad_example.wav

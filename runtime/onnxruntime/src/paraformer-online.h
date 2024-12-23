@@ -31,8 +31,10 @@ namespace funasr {
         }
         void InitOnline(
             knf::FbankOptions &fbank_opts,
-            std::shared_ptr<Ort::Session> &encoder_session,
-            std::shared_ptr<Ort::Session> &decoder_session,
+            //std::shared_ptr<Ort::Session> &encoder_session,
+            void* &p_bmrt_online_encoder,
+            //std::shared_ptr<Ort::Session> &decoder_session,
+            void* &p_bmrt_online_decoder,
             vector<const char*> &en_szInputNames,
             vector<const char*> &en_szOutputNames,
             vector<const char*> &de_szInputNames,
@@ -105,10 +107,21 @@ namespace funasr {
         // fsmn init caches
         std::vector<float> fsmn_init_cache_;
         std::vector<Ort::Value> decoder_onnx;
+        std::vector<float*> decoder_cache;
 
         bool is_first_chunk = true;
         bool is_last_chunk = false;
         double sqrt_factor;
+
+        // bmrt
+        bm_handle_t bm_handle;
+        bm_status_t status;
+        bool ret;
+        const bm_net_info_t *net_info;
+        const char **net_names;
+
+        void* p_bmrt_online_encoder;
+        void* p_bmrt_online_decoder;
 
     public:
         ParaformerOnline(Model* offline_handle, std::vector<int> chunk_size, std::string model_type=MODEL_PARA);

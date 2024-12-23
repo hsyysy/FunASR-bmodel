@@ -202,11 +202,11 @@ vector<int> CTTransformer::Infer(vector<int32_t> input_data)
     */
     // input tensor of punc
     bm_tensor_t input_tensors_punc[net_info->input_num];
-    bmrt_tensor(&input_tensors_punc[0], p_bmrt, BM_INT32, {2, {1, (int)input_data.size()}});
+    bmrt_tensor(&input_tensors_punc[0], p_bmrt, net_info->input_dtypes[0], {2, {1, (int)input_data.size()}});
     status = bm_memcpy_s2d_partial(bm_handle, input_tensors_punc[0].device_mem, input_data.data(), input_data.size()*sizeof(int32_t));
     assert(BM_SUCCESS == status);
 
-    bmrt_tensor(&input_tensors_punc[1], p_bmrt, BM_INT32, {1, {1}});
+    bmrt_tensor(&input_tensors_punc[1], p_bmrt, net_info->input_dtypes[1], {1, {1}});
     int32_t tl[1] = {static_cast<int32_t>(input_data.size())};
     status = bm_memcpy_s2d_partial(bm_handle, input_tensors_punc[1].device_mem, tl, sizeof(int32_t));
     assert(BM_SUCCESS == status);
@@ -232,16 +232,15 @@ vector<int> CTTransformer::Infer(vector<int32_t> input_data)
         auto punc_out_size = bmrt_tensor_bytesize(&output_tensors_punc[0]);
         auto punc_out_shape = output_tensors_punc[0].shape;
         auto outputCount = bmrt_shape_count(&punc_out_shape);
-        float* floatData = new float[outputCount];
-        status = bm_memcpy_d2s_partial(bm_handle, floatData, output_tensors_punc[0].device_mem, punc_out_size);
+        std::vector<float> floatData(outputCount);
+        status = bm_memcpy_d2s_partial(bm_handle, floatData.data(), output_tensors_punc[0].device_mem, punc_out_size);
         assert(BM_SUCCESS == status);
 
         for (int i = 0; i < outputCount; i += CANDIDATE_NUM)
         {
-            int index = Argmax(floatData + i, floatData + i + CANDIDATE_NUM-1);
+            int index = Argmax(floatData.begin() + i, floatData.begin() + i + CANDIDATE_NUM-1);
             punction.push_back(index);
         }
-        delete[] floatData;
         // free device memory
         for (int i = 0; i < net_info->output_num; ++i) {
             bm_free_device(bm_handle, input_tensors_punc[i].device_mem);

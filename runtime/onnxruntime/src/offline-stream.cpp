@@ -35,6 +35,7 @@ OfflineStream::OfflineStream(std::map<std::string, std::string>& model_path, int
         string token_path;
         string hw_cpu_model_path;
         string hw_gpu_model_path;
+        string hw_bmodel_path;
         string seg_dict_path;
     
         if(use_gpu){
@@ -59,15 +60,23 @@ OfflineStream::OfflineStream(std::map<std::string, std::string>& model_path, int
         bool enable_hotword = false;
         hw_cpu_model_path = PathAppend(model_path.at(MODEL_DIR), MODEL_EB_NAME);
         hw_gpu_model_path = PathAppend(model_path.at(MODEL_DIR), TORCH_MODEL_EB_NAME);
+        hw_bmodel_path    = PathAppend(model_path.at(MODEL_DIR), BMODEL_EB_NAME);
         seg_dict_path = PathAppend(model_path.at(MODEL_DIR), MODEL_SEG_DICT);
+        /*
         if (access(hw_cpu_model_path.c_str(), F_OK) == 0) { // if model_eb.onnx exist, hotword enabled
           enable_hotword = true;
-          //asr_handle->InitHwCompiler(hw_cpu_model_path, thread_num);
+          asr_handle->InitHwCompiler(hw_cpu_model_path, thread_num);
           asr_handle->InitSegDict(seg_dict_path);
         }
+        */
         if (use_gpu && access(hw_gpu_model_path.c_str(), F_OK) == 0) { // if model_eb.torchscript exist, hotword enabled
           enable_hotword = true;
           asr_handle->InitHwCompiler(hw_gpu_model_path, thread_num);
+          asr_handle->InitSegDict(seg_dict_path);
+        }
+        if (access(hw_bmodel_path.c_str(), F_OK) == 0) { // if eb_fp32.bmodel exist, hotword enabled
+          enable_hotword = true;
+          asr_handle->InitHwCompiler(hw_bmodel_path, thread_num);
           asr_handle->InitSegDict(seg_dict_path);
         }
 

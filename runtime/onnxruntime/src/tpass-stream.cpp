@@ -38,6 +38,7 @@ TpassStream::TpassStream(std::map<std::string, std::string>& model_path, int thr
         string token_path;
         string online_token_path;
         string hw_compile_model_path;
+        string hw_bmodel_path;
         string seg_dict_path;
         
         if (model_path.at(MODEL_DIR).find(MODEL_SVS) != std::string::npos)
@@ -50,17 +51,26 @@ TpassStream::TpassStream(std::map<std::string, std::string>& model_path, int thr
 
         bool enable_hotword = false;
         hw_compile_model_path = PathAppend(model_path.at(MODEL_DIR), MODEL_EB_NAME);
+        hw_bmodel_path = PathAppend(model_path.at(MODEL_DIR), BMODEL_EB_NAME);
         seg_dict_path = PathAppend(model_path.at(MODEL_DIR), MODEL_SEG_DICT);
+        /*
         if ((access(hw_compile_model_path.c_str(), F_OK) == 0) && 
             (access(seg_dict_path.c_str(), F_OK) == 0)) { // if model_eb.onnx exist, hotword enabled
           enable_hotword = true;
           asr_handle->InitHwCompiler(hw_compile_model_path, thread_num);
           asr_handle->InitSegDict(seg_dict_path);
         }
+        */
+        if ((access(hw_bmodel_path.c_str(), F_OK) == 0) &&
+            (access(seg_dict_path.c_str(), F_OK) == 0)) { // if eb_fp32.bmodel exist, hotword enabled
+          enable_hotword = true;
+          asr_handle->InitHwCompiler(hw_bmodel_path, thread_num);
+          asr_handle->InitSegDict(seg_dict_path);
+        }
 
         am_model_path = PathAppend(model_path.at(OFFLINE_MODEL_DIR), ENCODER_MODEL_NAME);
-        en_model_path = PathAppend(model_path.at(ONLINE_MODEL_DIR), ENCODER_NAME);
-        de_model_path = PathAppend(model_path.at(ONLINE_MODEL_DIR), DECODER_NAME);
+        en_model_path = PathAppend(model_path.at(ONLINE_MODEL_DIR), ENCODER_ONLINE_MODEL_NAME);
+        de_model_path = PathAppend(model_path.at(ONLINE_MODEL_DIR), DECODER_ONLINE_MODEL_NAME);
         online_token_path = PathAppend(model_path.at(ONLINE_MODEL_DIR), TOKEN_PATH);
         if(model_path.find(QUANTIZE) != model_path.end() && model_path.at(QUANTIZE) == "true"){
             am_model_path = PathAppend(model_path.at(OFFLINE_MODEL_DIR), QUANT_MODEL_NAME);

@@ -15,13 +15,12 @@ Paraformer::Paraformer()
 :use_hotword(false),
  env_(ORT_LOGGING_LEVEL_ERROR, "paraformer"),session_options_{},
  hw_env_(ORT_LOGGING_LEVEL_ERROR, "paraformer_hw"),hw_session_options{} {
+    status = bm_dev_request(&bm_handle, DEV_ID);
+    assert(BM_SUCCESS == status);
 }
 
 // bmrt
-void Paraformer::InitBmrt(const char* en_model, const char* de_model, int dev_id){
-    status = bm_dev_request(&bm_handle, dev_id);
-    assert(BM_SUCCESS == status);
-
+void Paraformer::InitBmrt(const char* en_model, const char* de_model){
     try {
         p_bmrt_offline_encoder = bmrt_create(bm_handle);
         assert(NULL != p_bmrt_offline_encoder);
@@ -63,7 +62,7 @@ void Paraformer::InitAsr(const std::string &am_model, const std::string &am_cmvn
     std::string model_dir = am_model.substr(0, am_model.size() - ENCODER_MODEL_NAME_LENGTH);
     std::string encoder_model = PathAppend(model_dir, ENCODER_MODEL_NAME);
     std::string decoder_model = PathAppend(model_dir, DECODER_MODEL_NAME);
-    InitBmrt(encoder_model.c_str(), decoder_model.c_str(), DEV_ID);
+    InitBmrt(encoder_model.c_str(), decoder_model.c_str());
     /*
     // session_options_.SetInterOpNumThreads(1);
     session_options_.SetIntraOpNumThreads(thread_num);
@@ -107,17 +106,30 @@ void Paraformer::InitAsr(const std::string &en_model, const std::string &de_mode
     // DisableCpuMemArena can improve performance
     session_options_.DisableCpuMemArena();
 
+    constexpr size_t ENCODER_ONLINE_MODEL_NAME_LENGTH = sizeof(ENCODER_ONLINE_MODEL_NAME) - 1;
+    std::string model_dir = en_model.substr(0, en_model.size() - ENCODER_ONLINE_MODEL_NAME_LENGTH);
+    std::string encoder_model = PathAppend(model_dir, ENCODER_ONLINE_MODEL_NAME);
+    std::string decoder_model = PathAppend(model_dir, DECODER_ONLINE_MODEL_NAME);
+
     try {
-        encoder_session_ = std::make_unique<Ort::Session>(env_, ORTSTRING(en_model).c_str(), session_options_);
-        LOG(INFO) << "Successfully load model from " << en_model;
+        //encoder_session_ = std::make_unique<Ort::Session>(env_, ORTSTRING(en_model).c_str(), session_options_);
+        p_bmrt_online_encoder = bmrt_create(bm_handle);
+        assert(NULL != p_bmrt_online_encoder);
+        ret = bmrt_load_bmodel(p_bmrt_online_encoder, encoder_model.c_str());
+        assert(true == ret);
+        LOG(INFO) << "Successfully load bmodel from " << encoder_model;
     } catch (std::exception const &e) {
-        LOG(ERROR) << "Error when load am encoder model: " << e.what();
+        LOG(ERROR) << "Error when load am encoder bmodel: " << e.what();
         exit(-1);
     }
 
     try {
-        decoder_session_ = std::make_unique<Ort::Session>(env_, ORTSTRING(de_model).c_str(), session_options_);
-        LOG(INFO) << "Successfully load model from " << de_model;
+        //decoder_session_ = std::make_unique<Ort::Session>(env_, ORTSTRING(de_model).c_str(), session_options_);
+        p_bmrt_online_decoder = bmrt_create(bm_handle);
+        assert(NULL != p_bmrt_online_decoder);
+        ret = bmrt_load_bmodel(p_bmrt_online_decoder, decoder_model.c_str());
+        assert(true == ret);
+        LOG(INFO) << "Successfully load bmodel from " << de_model;
     } catch (std::exception const &e) {
         LOG(ERROR) << "Error when load am decoder model: " << e.what();
         exit(-1);
@@ -125,6 +137,7 @@ void Paraformer::InitAsr(const std::string &en_model, const std::string &de_mode
 
     // encoder
     string strName;
+    /*
     GetInputName(encoder_session_.get(), strName);
     en_strInputNames.push_back(strName.c_str());
     GetInputName(encoder_session_.get(), strName,1);
@@ -159,6 +172,7 @@ void Paraformer::InitAsr(const std::string &en_model, const std::string &de_mode
         de_szInputNames_.push_back(item.c_str());
     for (auto& item : de_strOutputNames)
         de_szOutputNames_.push_back(item.c_str());
+    */
 
     vocab = new Vocab(token_file.c_str());
     phone_set_ = new PhoneSet(token_file.c_str());
@@ -176,7 +190,7 @@ void Paraformer::InitAsr(const std::string &am_model, const std::string &en_mode
     std::string model_dir = am_model.substr(0, am_model.size() - ENCODER_MODEL_NAME_LENGTH);
     std::string encoder_model = PathAppend(model_dir, ENCODER_MODEL_NAME);
     std::string decoder_model = PathAppend(model_dir, DECODER_MODEL_NAME);
-    InitBmrt(encoder_model.c_str(), decoder_model.c_str(), DEV_ID);
+    InitBmrt(encoder_model.c_str(), decoder_model.c_str());
     /*
     try {
         m_session_ = std::make_unique<Ort::Session>(env_, ORTSTRING(am_model).c_str(), session_options_);
@@ -275,19 +289,28 @@ void Paraformer::LoadOnlineConfigFromYaml(const char* filename){
 }
 
 void Paraformer::InitHwCompiler(const std::string &hw_model, int thread_num) {
+    /*
     hw_session_options.SetIntraOpNumThreads(thread_num);
     hw_session_options.SetGraphOptimizationLevel(ORT_ENABLE_ALL);
     // DisableCpuMemArena can improve performance
     hw_session_options.DisableCpuMemArena();
+    */
 
     try {
-        hw_m_session = std::make_unique<Ort::Session>(hw_env_, ORTSTRING(hw_model).c_str(), hw_session_options);
+        //hw_m_session = std::make_unique<Ort::Session>(hw_env_, ORTSTRING(hw_model).c_str(), hw_session_options);
+        status = bm_dev_request(&bm_handle, DEV_ID);
+        assert(BM_SUCCESS == status);
+        p_bmrt_hw = bmrt_create(bm_handle);
+        assert(NULL != p_bmrt_hw);
+        ret = bmrt_load_bmodel(p_bmrt_hw, hw_model.c_str());
+        assert(true == ret);
         LOG(INFO) << "Successfully load model from " << hw_model;
     } catch (std::exception const &e) {
-        LOG(ERROR) << "Error when load hw compiler onnx model: " << e.what();
+        LOG(ERROR) << "Error when load hw compiler bmodel: " << e.what();
         exit(-1);
     }
 
+    /*
     string strName;
     GetInputName(hw_m_session.get(), strName);
     hw_m_strInputNames.push_back(strName.c_str());
@@ -301,6 +324,7 @@ void Paraformer::InitHwCompiler(const std::string &hw_model, int thread_num) {
         hw_m_szInputNames.push_back(item.c_str());
     for (auto& item : hw_m_strOutputNames)
         hw_m_szOutputNames.push_back(item.c_str());
+    */
     // if init hotword compiler is called, this is a hotword paraformer model
     use_hotword = true;
 }
@@ -328,6 +352,15 @@ Paraformer::~Paraformer()
     }
     if(p_bmrt_offline_decoder){
         bmrt_destroy(p_bmrt_offline_decoder);
+    }
+    if(p_bmrt_online_encoder){
+        bmrt_destroy(p_bmrt_online_encoder);
+    }
+    if(p_bmrt_online_decoder){
+        bmrt_destroy(p_bmrt_online_decoder);
+    }
+    if(p_bmrt_hw){
+        bmrt_destroy(p_bmrt_hw);
     }
     if(bm_handle){
         bm_dev_free(bm_handle);
@@ -564,11 +597,11 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         // input tensor of encoder
         bm_tensor_t input_tensors_encoder[net_info->input_num];
 
-        bmrt_tensor(&input_tensors_encoder[0], p_bmrt_offline_encoder, BM_FLOAT32, {3, {1, num_frames, feat_dim}});
+        bmrt_tensor(&input_tensors_encoder[0], p_bmrt_offline_encoder, net_info->input_dtypes[0], {3, {1, num_frames, feat_dim}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_encoder[0].device_mem, wav_feats.data(), wav_feats.size()*sizeof(float));
         assert(BM_SUCCESS == status);
 
-        bmrt_tensor(&input_tensors_encoder[1], p_bmrt_offline_encoder, BM_INT32, {1, {1}});
+        bmrt_tensor(&input_tensors_encoder[1], p_bmrt_offline_encoder, net_info->input_dtypes[1], {1, {1}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_encoder[1].device_mem, &num_frames, sizeof(int32_t));
         assert(BM_SUCCESS == status);
 
@@ -594,43 +627,25 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         assert(true == ret);
         bm_thread_sync(bm_handle);
 
-        // encoder_out
-        /*
-        auto encoder_out_size = bmrt_tensor_bytesize(&output_tensors_encoder[0]);
-        auto encoder_out_shape = output_tensors_encoder[0].shape;
-        auto encoder_out_count = bmrt_shape_count(&encoder_out_shape);
-        float* encoder_out = new float[encoder_out_count];
-        status = bm_memcpy_d2s_partial(bm_handle, encoder_out, output_tensors_encoder[0].device_mem, encoder_out_size);
-        assert(BM_SUCCESS == status);
-        */
-
         // hidden
-        auto output0size = bmrt_tensor_bytesize(&output_tensors_encoder[1]);
-        auto output0count = bmrt_shape_count(&output_tensors_encoder[1].shape);
-        auto output0 = new float[output0count];
-        status = bm_memcpy_d2s_partial(bm_handle, output0, output_tensors_encoder[1].device_mem, output0size);
+        output_data.resize(bmrt_shape_count(&output_tensors_encoder[1].shape));
+        status = bm_memcpy_d2s_partial(bm_handle, output_data.data(), output_tensors_encoder[1].device_mem, bmrt_tensor_bytesize(&output_tensors_encoder[1]));
         assert(BM_SUCCESS == status);
-        std::vector<std::vector<std::vector<float>>> hidden;
         int batch_size = output_tensors_encoder[1].shape.dims[0];
         int time_steps = output_tensors_encoder[1].shape.dims[1];
         int hidden_size = output_tensors_encoder[1].shape.dims[2];
-        hidden.resize(batch_size);
-        for (int b = 0; b < batch_size; ++b) {
-            hidden[b].resize(time_steps);
-            for (int t = 0; t < time_steps; ++t) {
-                hidden[b][t].resize(hidden_size);
-                for (int h = 0; h < hidden_size; ++h) {
-                    hidden[b][t][h] = output0[b * time_steps * hidden_size + t * hidden_size + h];
-                }
+        std::vector<std::vector<std::vector<float>>> hidden(batch_size, std::vector<std::vector<float>>(time_steps, std::vector<float>(hidden_size)));
+        auto output_it = output_data.begin();
+        for (auto& batch : hidden) {
+            for (auto& time_step : batch) {
+                std::copy(output_it, output_it + hidden_size, time_step.begin());
+                output_it += hidden_size;
             }
         }
-        delete[] output0;
 
         // alphas
-        output0size = bmrt_tensor_bytesize(&output_tensors_encoder[2]);
-        output0count = bmrt_shape_count(&output_tensors_encoder[2].shape);
-        output0 = new float[output0count];
-        status = bm_memcpy_d2s_partial(bm_handle, output0, output_tensors_encoder[2].device_mem, output0size);
+        output_data.resize(bmrt_shape_count(&output_tensors_encoder[2].shape));
+        status = bm_memcpy_d2s_partial(bm_handle, output_data.data(), output_tensors_encoder[2].device_mem, bmrt_tensor_bytesize(&output_tensors_encoder[2]));
         assert(BM_SUCCESS == status);
         std::vector<std::vector<float>> alphas;
         batch_size = output_tensors_encoder[2].shape.dims[0];
@@ -639,50 +654,38 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         for (int b = 0; b < batch_size; ++b) {
             alphas[b].resize(time_steps);
             for (int t = 0; t < time_steps; ++t) {
-                alphas[b][t] = output0[b * time_steps + t];
+                alphas[b][t] = output_data[b * time_steps + t];
             }
         }
-        delete[] output0;
 
         // pre_token_length
-        output0size = bmrt_tensor_bytesize(&output_tensors_encoder[3]);
-        output0count = bmrt_shape_count(&output_tensors_encoder[3].shape);
-        auto pre_token_length = new float[output0count];
-        status = bm_memcpy_d2s_partial(bm_handle, pre_token_length, output_tensors_encoder[3].device_mem, output0size);
+        output_data.resize(bmrt_shape_count(&output_tensors_encoder[3].shape));
+        status = bm_memcpy_d2s_partial(bm_handle, output_data.data(), output_tensors_encoder[3].device_mem, bmrt_tensor_bytesize(&output_tensors_encoder[3]));
         assert(BM_SUCCESS == status);
-        auto token_num_int_f = pre_token_length[0];
-        for (int i=1;i<output0count;i++)
-            if (pre_token_length[i] > token_num_int_f)
-                token_num_int_f = pre_token_length[i];
-        auto token_num_int = static_cast<int>(token_num_int_f);
+        auto token_num_int = static_cast<int>(*std::max_element(output_data.begin(), output_data.end()));
 
         std::vector<long> pre_token_length_rounded;
-        for (int i = 0; i < output0count; i++){
-            long rounded_value = static_cast<long>(std::round(pre_token_length[i]));
-            pre_token_length_rounded.push_back(rounded_value);
+        for (int i = 0; i < output_data.size(); i++){
+            pre_token_length_rounded.push_back(static_cast<long>(std::round(output_data[i])));
         }
-        delete[] pre_token_length;
 
         // before next bmodel
         auto cif_result = cif(hidden, alphas, 1.0f);
 
         auto pre_acoustic_embeds = cif_result.first;
         auto cif_peak = cif_result.second;
-        int pre_acoustic_embeds_size = pre_acoustic_embeds.size();
         int feature_size = pre_acoustic_embeds[0][0].size();
-        int pre_acoustic_embeds2_count = pre_acoustic_embeds_size * token_num_int * feature_size;
-        float pre_acoustic_embeds2[pre_acoustic_embeds2_count];
-        int k=0;
-        for (int i = 0; i < pre_acoustic_embeds_size; ++i) {
-            for (int j = 0; j < token_num_int; ++j) {
-                const auto& row = pre_acoustic_embeds[i][j];
-                for (int jj = 0; jj < feature_size; ++jj) {
-                    pre_acoustic_embeds2[k++] = row[jj];
-                }
+        std::vector<float> pre_acoustic_embeds2;
+        pre_acoustic_embeds2.reserve(batch_size*token_num_int*feature_size);
+        for (const auto& matrix : pre_acoustic_embeds) {
+            for (int i = 0; i < token_num_int; ++i) {
+                pre_acoustic_embeds2.insert(pre_acoustic_embeds2.end(), matrix[i].begin(), matrix[i].end());
             }
         }
 
+        int hw_emb_count = static_cast<int>(hw_emb.size());
         std::vector<float> hw_embed;
+        hw_embed.reserve(hw_emb_count);
         for (const auto& row : hw_emb) {
             hw_embed.insert(hw_embed.end(), row.begin(), row.end());
         }
@@ -694,20 +697,20 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         assert(NULL != net_info);
         bm_tensor_t input_tensors_decoder[5];
 
-        bmrt_tensor_with_device(&input_tensors_decoder[0], output_tensors_encoder[0].device_mem, BM_FLOAT32, {3, {batch_size, num_frames, 512}});
+        bmrt_tensor_with_device(&input_tensors_decoder[0], output_tensors_encoder[0].device_mem, net_info->input_dtypes[0], {3, {batch_size, num_frames, 512}});
 
-        bmrt_tensor_with_device(&input_tensors_decoder[1], input_tensors_encoder[1].device_mem, BM_INT32, {1, {batch_size}});
+        bmrt_tensor_with_device(&input_tensors_decoder[1], input_tensors_encoder[1].device_mem, net_info->input_dtypes[1], {1, {batch_size}});
 
-        bmrt_tensor(&input_tensors_decoder[2], p_bmrt_offline_decoder, BM_FLOAT32, {3, {batch_size, token_num_int, static_cast<int>(pre_acoustic_embeds[0][0].size())}});
-        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[2].device_mem, pre_acoustic_embeds2, pre_acoustic_embeds2_count*sizeof(float));
+        bmrt_tensor(&input_tensors_decoder[2], p_bmrt_offline_decoder, net_info->input_dtypes[2], {3, {batch_size, token_num_int, feature_size}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[2].device_mem, pre_acoustic_embeds2.data(), pre_acoustic_embeds2.size()*sizeof(float));
         assert(BM_SUCCESS == status);
 
-        bmrt_tensor(&input_tensors_decoder[3], p_bmrt_offline_decoder, BM_INT32, {1, {batch_size}});
+        bmrt_tensor(&input_tensors_decoder[3], p_bmrt_offline_decoder, net_info->input_dtypes[3], {1, {batch_size}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[3].device_mem, pre_token_length_rounded.data(), batch_size*sizeof(int32_t));
         assert(BM_SUCCESS == status);
 
-        bmrt_tensor(&input_tensors_decoder[4], p_bmrt_offline_decoder, BM_FLOAT32, {3, {batch_size, static_cast<int>(hw_emb.size()), 512}});
-        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[4].device_mem, hw_embed.data(), batch_size*static_cast<int>(hw_emb.size())*512*sizeof(float));
+        bmrt_tensor(&input_tensors_decoder[4], p_bmrt_offline_decoder, net_info->input_dtypes[4], {3, {batch_size, hw_emb_count, 512}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[4].device_mem, hw_embed.data(), batch_size*hw_emb_count*512*sizeof(float));
         assert(BM_SUCCESS == status);
 
         bm_tensor_t output_tensors_decoder[1];
@@ -719,11 +722,9 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         assert(true == ret);
         bm_thread_sync(bm_handle);
 
-        auto decoder_out_size = bmrt_tensor_bytesize(&output_tensors_decoder[0]);
         auto decoder_out_shape = output_tensors_decoder[0].shape;
-        auto decoder_out_count = bmrt_shape_count(&decoder_out_shape);
-        float* decoder_out = new float[decoder_out_count];
-        status = bm_memcpy_d2s_partial(bm_handle, decoder_out, output_tensors_decoder[0].device_mem, decoder_out_size);
+        output_data.resize(bmrt_shape_count(&decoder_out_shape));
+        status = bm_memcpy_d2s_partial(bm_handle, output_data.data(), output_tensors_decoder[0].device_mem, bmrt_tensor_bytesize(&output_tensors_decoder[0]));
         assert(BM_SUCCESS == status);
         auto decoder_out_lens = decoder_out_shape.dims[1];
         auto decoder_out_vocab = decoder_out_shape.dims[2];
@@ -752,11 +753,10 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
             bm_free_device(bm_handle, output_tensors_decoder[i].device_mem);
         }
 
-        result = BeamSearch(wfst_decoder, decoder_out, decoder_out_lens, decoder_out_vocab);
+        result = BeamSearch(wfst_decoder, output_data.data(), decoder_out_lens, decoder_out_vocab);
         if (input_finished) {
             result = FinalizeDecode(wfst_decoder);
         }
-        delete[] decoder_out;
 
         /*
         auto outputTensor = m_session_->Run(Ort::RunOptions{nullptr}, m_szInputNames.data(), input_onnx.data(), input_onnx.size(), m_szOutputNames.data(), m_szOutputNames.size());
@@ -869,6 +869,7 @@ std::vector<std::vector<float>> Paraformer::CompileHotwordEmbedding(std::string 
     hotword_matrix.insert(hotword_matrix.end(), blank_vec.begin(), blank_vec.end());
     lengths.push_back(1);
 
+    /*
 #ifdef _WIN_X86
         Ort::MemoryInfo m_memoryInfo = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
 #else
@@ -881,13 +882,35 @@ std::vector<std::vector<float>> Paraformer::CompileHotwordEmbedding(std::string 
         hotword_size * max_hotword_len,
         input_shape_,
         2);
+    */
     LOG(INFO) << "clas shape " << hotword_size << " " << max_hotword_len << std::endl;
     
+    /*
     std::vector<Ort::Value> input_onnx;
     input_onnx.emplace_back(std::move(onnx_hotword));
+    */
 
     std::vector<std::vector<float>> result;
     try {
+        //bmrt
+        net_names = NULL;
+        bmrt_get_network_names(p_bmrt_hw, &net_names);
+        net_info = bmrt_get_network_info(p_bmrt_hw, net_names[0]);
+        assert(NULL != net_info);
+        bm_tensor_t input_tensors_hw[1];
+        bmrt_tensor(&input_tensors_hw[0], p_bmrt_hw, net_info->input_dtypes[0], {2, {hotword_size, max_hotword_len}});
+        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_hw[0].device_mem, (int32_t*)hotword_matrix.data(), hotword_size*max_hotword_len*sizeof(int32_t));
+        assert(BM_SUCCESS == status);
+
+        bm_tensor_t output_tensors_hw[1];
+        status = bm_malloc_device_byte(bm_handle, &output_tensors_hw[0].device_mem, net_info->max_output_bytes[0]);
+        assert(BM_SUCCESS == status);
+
+        //forward
+        ret = bmrt_launch_tensor_ex(p_bmrt_hw, net_names[0], input_tensors_hw, 1, output_tensors_hw, 1, true, false);
+        assert(true == ret);
+        bm_thread_sync(bm_handle);
+        /*
         auto outputTensor = hw_m_session->Run(Ort::RunOptions{nullptr}, hw_m_szInputNames.data(), input_onnx.data(), input_onnx.size(), hw_m_szOutputNames.data(), hw_m_szOutputNames.size());
         std::vector<int64_t> outputShape = outputTensor[0].GetTensorTypeAndShapeInfo().GetShape();
 
@@ -897,13 +920,28 @@ std::vector<std::vector<float>> Paraformer::CompileHotwordEmbedding(std::string 
         assert(outputShape[0] == max_hotword_len);
         assert(outputShape[1] == hotword_size);
         embedding_dim = outputShape[2];
+        */
+        auto hotword_out_shape = output_tensors_hw[0].shape;
+        std::vector<float> floatData(bmrt_shape_count(&hotword_out_shape));
+        status = bm_memcpy_d2s_partial(bm_handle, floatData.data(), output_tensors_hw[0].device_mem, bmrt_tensor_bytesize(&output_tensors_hw[0]));
+        assert(BM_SUCCESS == status);
+
+        assert(hotword_out_shape.dims[0] == max_hotword_len);
+        assert(hotword_out_shape.dims[1] == hotword_size);
+        embedding_dim = hotword_out_shape.dims[2];
 
         for (int j = 0; j < hotword_size; j++)
         {
             int start_pos = hotword_size * (lengths[j] - 1) * embedding_dim + j * embedding_dim;
             std::vector<float> embedding;
-            embedding.insert(embedding.begin(), floatData + start_pos, floatData + start_pos + embedding_dim);
+            embedding.insert(embedding.begin(), floatData.begin() + start_pos, floatData.begin() + start_pos + embedding_dim);
             result.push_back(embedding);
+        }
+        for (int i = 0; i < net_info->input_num; ++i) {
+            bm_free_device(bm_handle, input_tensors_hw[i].device_mem);
+        }
+        for (int i = 0; i < net_info->output_num; ++i) {
+            bm_free_device(bm_handle, output_tensors_hw[i].device_mem);
         }
     }
     catch (std::exception const &e)

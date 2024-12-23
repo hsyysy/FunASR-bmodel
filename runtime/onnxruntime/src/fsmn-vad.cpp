@@ -69,7 +69,6 @@ void FsmnVad::ReadModel(const char* vad_model, int dev_id) {
         assert(NULL != net_info);
         LOG(INFO) << "Successfully load model from " << vad_model;
     } catch (std::exception const &e) {
-        //LOG(ERROR) << "Error when load vad onnx model: " << e.what();
         LOG(ERROR) << "Error when load vad bmodel: " << e.what();
         exit(-1);
     }
@@ -113,12 +112,12 @@ void FsmnVad::Forward(
 
     // input tensor of vad
     bm_tensor_t input_tensors_vad[net_info->input_num];
-    bmrt_tensor(&input_tensors_vad[0], p_bmrt, BM_FLOAT32, {3, {1, num_frames, feature_dim}});
+    bmrt_tensor(&input_tensors_vad[0], p_bmrt, net_info->input_dtypes[0], {3, {1, num_frames, feature_dim}});
     status = bm_memcpy_s2d_partial(bm_handle, input_tensors_vad[0].device_mem, vad_feats.data(), vad_feats.size()*sizeof(float));
     assert(BM_SUCCESS == status);
 
     for (int i=0;i<4;i++){
-        bmrt_tensor(&input_tensors_vad[i+1], p_bmrt, BM_FLOAT32, {4, {1, 128, 19, 1}});
+        bmrt_tensor(&input_tensors_vad[i+1], p_bmrt, net_info->input_dtypes[i+1], {4, {1, 128, 19, 1}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_vad[i+1].device_mem, (*in_cache)[i].data(), (*in_cache)[i].size()*sizeof(float));
     }
     // output tensor of vad
@@ -150,8 +149,8 @@ void FsmnVad::Forward(
     int num_outputs = vad_out_shape.dims[1];
     int output_dim = vad_out_shape.dims[2];
     auto vad_out_count = bmrt_shape_count(&vad_out_shape);
-    float* logp_data = new float[vad_out_count];
-    status = bm_memcpy_d2s_partial(bm_handle, logp_data, output_tensors_vad[0].device_mem, vad_out_size);
+    std::vector<float> logp_data(vad_out_count);
+    status = bm_memcpy_d2s_partial(bm_handle, logp_data.data(), output_tensors_vad[0].device_mem, vad_out_size);
     assert(BM_SUCCESS == status);
 
     // 5. Change infer result to output shapes
@@ -163,10 +162,9 @@ void FsmnVad::Forward(
     out_prob->resize(num_outputs);
     for (int i = 0; i < num_outputs; i++) {
         (*out_prob)[i].resize(output_dim);
-        memcpy((*out_prob)[i].data(), logp_data + i * output_dim,
+        memcpy((*out_prob)[i].data(), logp_data.data() + i * output_dim,
                sizeof(float) * output_dim);
     }
-    delete[] logp_data;
   
     // get 4 caches outputs,each size is 128*19
     if(!is_final){
@@ -175,11 +173,10 @@ void FsmnVad::Forward(
         auto cache_out_size = bmrt_tensor_bytesize(&output_tensors_vad[i]);
         auto cache_out_shape = output_tensors_vad[i].shape;
         auto cache_out_count = bmrt_shape_count(&cache_out_shape);
-        float* data = new float[cache_out_count];
-        status = bm_memcpy_d2s_partial(bm_handle, data, output_tensors_vad[i].device_mem, cache_out_size);
+        std::vector<float> data(cache_out_count);
+        status = bm_memcpy_d2s_partial(bm_handle, data.data(), output_tensors_vad[i].device_mem, cache_out_size);
         assert(BM_SUCCESS == status);
-        memcpy((*in_cache)[i-1].data(), data, sizeof(float) * 128*19);
-        delete[] data;
+        memcpy((*in_cache)[i-1].data(), data.data(), sizeof(float) * 128*19);
         }
     }
     for (int i = 0; i < net_info->output_num; ++i) {
