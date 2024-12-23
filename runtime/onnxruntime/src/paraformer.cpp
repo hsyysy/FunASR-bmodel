@@ -347,19 +347,19 @@ Paraformer::~Paraformer()
     if(phone_set_){
         delete phone_set_;
     }
-    if(p_bmrt_offline_encoder){
+    if(p_bmrt_offline_encoder!=NULL){
         bmrt_destroy(p_bmrt_offline_encoder);
     }
-    if(p_bmrt_offline_decoder){
+    if(p_bmrt_offline_decoder!=NULL){
         bmrt_destroy(p_bmrt_offline_decoder);
     }
-    if(p_bmrt_online_encoder){
+    if(p_bmrt_online_encoder!=NULL){
         bmrt_destroy(p_bmrt_online_encoder);
     }
-    if(p_bmrt_online_decoder){
+    if(p_bmrt_online_decoder!=NULL){
         bmrt_destroy(p_bmrt_online_decoder);
     }
-    if(p_bmrt_hw){
+    if(p_bmrt_hw!=NULL){
         bmrt_destroy(p_bmrt_hw);
     }
     if(bm_handle){

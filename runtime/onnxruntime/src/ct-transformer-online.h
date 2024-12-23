@@ -38,7 +38,7 @@ public:
 	bm_handle_t bm_handle;
 	bm_status_t status;
 	bool ret;
-	void* p_bmrt;
+	void* p_bmrt = NULL;
 	const bm_net_info_t *net_info;
 	const char **net_names;
 };

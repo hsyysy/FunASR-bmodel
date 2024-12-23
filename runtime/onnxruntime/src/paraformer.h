@@ -94,11 +94,11 @@ namespace funasr {
         bm_status_t status;
         bool ret;
 
-        void* p_bmrt_online_encoder;
-        void* p_bmrt_online_decoder;
-        void* p_bmrt_offline_encoder;
-        void* p_bmrt_offline_decoder;
-        void* p_bmrt_hw;
+        void* p_bmrt_online_encoder = NULL;
+        void* p_bmrt_online_decoder = NULL;
+        void* p_bmrt_offline_encoder = NULL;
+        void* p_bmrt_offline_decoder = NULL;
+        void* p_bmrt_hw = NULL;
         const bm_net_info_t *net_info;
         const char **net_names;
         std::vector<float> output_data;

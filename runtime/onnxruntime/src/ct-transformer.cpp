@@ -49,7 +49,7 @@ void CTTransformer::InitPunc(const std::string &punc_model, const std::string &p
 
 CTTransformer::~CTTransformer()
 {
-    if(p_bmrt){
+    if(p_bmrt!=NULL){
         bmrt_destroy(p_bmrt);
     }
     if(bm_handle){
