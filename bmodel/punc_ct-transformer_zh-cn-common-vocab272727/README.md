@@ -1,6 +1,6 @@
 ## 模型编译
 
-源模型需要编译成BModel才能在SOPHON TPU上运行，源模型在编译前要导出成onnx模型，具体可参考[模型导出](./docs/Export_Guide.md)。
+源模型需要编译成BModel才能在SOPHON TPU上运行，源模型在编译前要导出成onnx模型，具体可参考[导出ONNX](https://github.com/modelscope/FunASR/blob/main/README_zh.md#%E5%AF%BC%E5%87%BAonnx)。
 
 建议使用TPU-MLIR编译BModel，模型编译前需要安装TPU-MLIR编译环境，具体可参考[TPU-MLIR环境搭建](https://github.com/sophgo/sophon-demo/blob/release/docs/Environment_Install_Guide.md#1-tpu-mlir环境搭建)。安装好后需在TPU-MLIR环境中进入例程目录，并使用本例程提供的脚本将onnx模型编译为BModel。脚本中命令的详细说明可参考《TPU-MLIR开发手册》( 请从[算能官网](https://developer.sophgo.com/site/index.html?categoryActive=material)相应版本的SDK中获取)。
 
