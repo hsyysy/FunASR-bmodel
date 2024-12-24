@@ -20,10 +20,11 @@ function gen_mlir()
         --model_def ../models/onnx/model_${name}.onnx \
         --input_shapes [[100,10]] \
         --dynamic \
-        --output_names /Transpose_output_0,/bias_encoder/ConstantOfShape_output_0 \
         --test_input ${name}_input_1b.npz \
         --test_result ${name}_output.npz \
         --mlir ${name}.mlir
+
+        #--output_names /Transpose_output_0,/bias_encoder/ConstantOfShape_output_0 \
 }
 
 function gen_fp32bmodel()
