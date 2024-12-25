@@ -61,6 +61,9 @@ ParaformerOnline::ParaformerOnline(Model* offline_handle, std::vector<int> chunk
     }
     */
     InitCache();
+    for (int i=0;i<16;i++){
+        bm_malloc_device_byte(bm_handle, &cache_mem[i], 5120*sizeof(float));
+    }
 }
 
 void ParaformerOnline::InitOnline(
@@ -362,7 +365,6 @@ void ParaformerOnline::InitCache(){
     alphas_cache_.clear();
     feats_cache_.clear();
     //decoder_onnx.clear();
-    decoder_cache.clear();
 
     // cif cache
     std::vector<float> hidden_cache(encoder_size, 0);
@@ -392,7 +394,7 @@ void ParaformerOnline::InitCache(){
             3);
         decoder_onnx.emplace_back(std::move(onnx_fsmn_cache));
         */
-        decoder_cache.emplace_back(std::move(fsmn_init_cache_.data()));
+        bm_memcpy_s2d(bm_handle, cache_mem[l], fsmn_init_cache_.data());
     }
 };
 
@@ -612,9 +614,7 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             assert(BM_SUCCESS == status);
 
             for (int i=0;i<16;i++){
-                bmrt_tensor(&input_tensors_decoder[i+4], p_bmrt_online_decoder, net_info->input_dtypes[i+4], {3, {1,512,10}});
-                status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[i+4].device_mem, decoder_cache[i], 5120*sizeof(float));
-                assert(BM_SUCCESS == status);
+                bmrt_tensor_with_device(&input_tensors_decoder[i+4], cache_mem[i], net_info->input_dtypes[i+4], {3, {1,512,10}});
             }
             // output tensor of decoder
             bm_tensor_t output_tensors_decoder[net_info->output_num];
@@ -637,17 +637,17 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
 
             //auto decoder_tensor = decoder_session_->Run(Ort::RunOptions{nullptr}, de_szInputNames_.data(), decoder_onnx.data(), decoder_onnx.size(), de_szOutputNames_.data(), de_szOutputNames_.size());
             // fsmn cache
+            /*
             try{
-                //decoder_onnx.clear();
-                decoder_cache.clear();
+                decoder_onnx.clear();
             }catch (std::exception const &e)
             {
                 LOG(ERROR)<<e.what();
                 return result;
             }
+            */
             for(int l=0;l<fsmn_layers;l++){
-                status = bm_memcpy_d2s_partial(bm_handle, decoder_cache[l], output_tensors_decoder[l+2].device_mem, bmrt_tensor_bytesize(&output_tensors_decoder[2+l]));
-                assert(BM_SUCCESS == status);
+                assert(BM_SUCCESS == bm_memcpy_d2d_byte(bm_handle, cache_mem[l], 0, output_tensors_decoder[l+2].device_mem, 0, 5120*sizeof(float)));
                 //decoder_onnx.emplace_back(std::move(decoder_tensor[2+l]));
             }
 
@@ -658,7 +658,7 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             */
             result = offline_handle_->GreedySearch(float_data.data(), list_frame.size(), decoder_out_shape.dims[2]);
 
-            for (int i = 0; i < net_info->input_num; ++i) {
+            for (int i = 0; i < 4; ++i) {
                 bm_free_device(bm_handle, input_tensors_decoder[i].device_mem);
             }
             for (int i = 0; i < net_info->output_num; ++i) {
@@ -759,6 +759,9 @@ string ParaformerOnline::Forward(float* din, int len, bool input_finished, const
 
 ParaformerOnline::~ParaformerOnline()
 {
+    for (int i=0;i<16;i++){
+        bm_free_device(bm_handle, cache_mem[i]);
+    }
 }
 
 string ParaformerOnline::Rescoring()

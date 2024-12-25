@@ -107,7 +107,6 @@ namespace funasr {
         // fsmn init caches
         std::vector<float> fsmn_init_cache_;
         std::vector<Ort::Value> decoder_onnx;
-        std::vector<float*> decoder_cache;
 
         bool is_first_chunk = true;
         bool is_last_chunk = false;
@@ -119,6 +118,7 @@ namespace funasr {
         bool ret;
         const bm_net_info_t *net_info;
         const char **net_names;
+        bm_device_mem_t cache_mem[16];
 
         void* p_bmrt_online_encoder;
         void* p_bmrt_online_decoder;
