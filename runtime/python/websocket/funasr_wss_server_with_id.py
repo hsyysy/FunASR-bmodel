@@ -8,7 +8,7 @@ import numpy as np
 import argparse
 import ssl
 import base64
-
+from datetime import datetime
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -203,7 +203,8 @@ async def ws_serve(websocket, path):
                     message["data"] = base64.b64decode(message["data"])
                     frames.append(message)
                     duration_ms = len(message["data"]) // 32
-                    #print("\033[92mRecving ["+format(message["idstart"],'4d')+"]\033[0m")
+                    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                    print("\033[92mRecving ["+format(message["id"],'10d')+"]: "+current_time_str+"\033[0m")
                     websocket.vad_pre_idx += duration_ms
 
                     if speech_start:

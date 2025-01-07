@@ -15,6 +15,7 @@ import numpy as np
 # from funasr.fileio.datadir_writer import DatadirWriter
 
 import logging
+from datetime import datetime
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -219,7 +220,8 @@ async def record_from_scp(chunk_begin, chunk_size):
             beg = i * stride
             data = audio_bytes[beg : beg + stride]
             sent_timestamps.append([i,time.time()])
-            #print("\033[92mSending ["+format(i,'4d')+"]\033[0m")
+            current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            print("\033[92mSending ["+format(i,'10d')+"]: "+current_time_str+"\033[0m")
             data_dict = {"id":i,"data":base64.b64encode(data).decode('utf-8')}
             message = json.dumps(data_dict).encode('utf-8')
             # voices.put(message)
@@ -273,7 +275,8 @@ async def message(id):
             audio_idend = meg["idend"]
             text_type = meg["type"]
             #print("recording recv at start = "+str(audio_idstart)+", end = "+str(audio_idend))
-            #print("\033[93mRecving "+format(audio_idend,'4d') + ": " + text+"\033[0m")
+            current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            print("\033[93mRecving ["+format(audio_idend,'10d') + "]: "+ current_time_str +"\033[0m")
             if text_type == "online":
                 type_id = 0
                 print("\033[94monline  ["+format(audio_idstart,'10d')+"]["+format(audio_idend,'10d') + "]: " + text+"\033[0m")
