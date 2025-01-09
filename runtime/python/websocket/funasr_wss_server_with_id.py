@@ -238,7 +238,7 @@ async def ws_serve(websocket, path):
                                     print(f"error in asr streaming, {websocket.status_dict_asr_online}")
                             frames_asr_online = []
                 # asr punc offline
-                if speech_end_i != -1 or not websocket.is_speaking:
+                if (speech_end_i != -1 or not websocket.is_speaking) and len(frames_asr) > 0:
                     # print("vad end point")
                     if websocket.mode == "2pass" or websocket.mode == "offline":
                         audio_in = {"idstart":frames_asr[0]["id"], "idend":frames_asr[-1]["id"],
