@@ -494,7 +494,7 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
         auto enc_shape = output_tensors_encoder[0].shape;
         auto enc_count = bmrt_shape_count(&enc_shape);
         std::vector<float> enc_data;
-        enc_data.reserve(enc_count);
+        enc_data.resize(enc_count);
         status = bm_memcpy_d2s_partial(bm_handle, enc_data.data(), output_tensors_encoder[0].device_mem, bmrt_tensor_bytesize(&output_tensors_encoder[0]));
         assert(BM_SUCCESS == status);
 
