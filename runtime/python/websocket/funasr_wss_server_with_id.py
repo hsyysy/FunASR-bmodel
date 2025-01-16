@@ -204,7 +204,8 @@ async def ws_serve(websocket, path):
                     frames.append(message)
                     duration_ms = len(message["data"]) // 32
                     current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                    print("\033[92mRecving ["+format(message["id"],'10d')+"]: "+current_time_str+"\033[0m")
+                    #print("\033[92mRecving ["+format(message["id"],'10d')+"]: "+current_time_str+"\033[0m")
+                    print("Recving ["+format(message["id"],'10d')+"]: "+current_time_str)
                     websocket.vad_pre_idx += duration_ms
 
                     if speech_start:
@@ -283,7 +284,8 @@ async def async_vad(websocket, audio_in):
     if segments_result[0][1] != -1:
         speech_end = segments_result[0][1]
     if speech_start != -1 or speech_end != -1:
-        print("\033[95mvad ["+format(audio_in["id"],'10d')+"]: ["+format(speech_start,'10d')+"] -> ["+format(speech_end,'10')+"]\033[0m")
+        #print("\033[95mvad ["+format(audio_in["id"],'10d')+"]: ["+format(speech_start,'10d')+"] -> ["+format(speech_end,'10')+"]\033[0m")
+        print("vad ["+format(audio_in["id"],'10d')+"]: ["+format(speech_start,'10d')+"] -> ["+format(speech_end,'10')+"]")
     return speech_start, speech_end
 
 
@@ -291,7 +293,8 @@ async def async_asr(websocket, audio_in):
     if len(audio_in) > 0:
         # print(len(audio_in))
         rec_result = model_asr.generate(input=audio_in["data"], **websocket.status_dict_asr)[0]
-        print("\033[93moffline ["+format(audio_in["idstart"],'10d')+"]["+format(audio_in["idend"],'10d')+"]:"+rec_result["text"]+"\033[0m")
+        #print("\033[93moffline ["+format(audio_in["idstart"],'10d')+"]["+format(audio_in["idend"],'10d')+"]:"+rec_result["text"]+"\033[0m")
+        print("offline ["+format(audio_in["idstart"],'10d')+"]["+format(audio_in["idend"],'10d')+"]:"+rec_result["text"])
         # print("offline_asr, ", rec_result)
         if model_punc is not None and len(rec_result["text"]) > 0:
             # print("offline, before punc", rec_result, "cache", websocket.status_dict_punc)
@@ -336,7 +339,8 @@ async def async_asr_online(websocket, audio_in):
         rec_result = model_asr_streaming.generate(
             input=audio_in["data"], **websocket.status_dict_asr_online
         )[0]
-        print("\033[94monline  ["+format(audio_in["idstart"],'10d')+"]["+format(audio_in["idend"],'10d')+"]:"+rec_result["text"]+"\033[0m")
+        #print("\033[94monline  ["+format(audio_in["idstart"],'10d')+"]["+format(audio_in["idend"],'10d')+"]:"+rec_result["text"]+"\033[0m")
+        print("online  ["+format(audio_in["idstart"],'10d')+"]["+format(audio_in["idend"],'10d')+"]:"+rec_result["text"])
         # print("online, ", rec_result)
         if websocket.mode == "2pass" and websocket.status_dict_asr_online.get("is_final", False):
             return
