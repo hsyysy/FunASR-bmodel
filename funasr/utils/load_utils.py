@@ -4,7 +4,7 @@ import json
 from io import BytesIO
 import torch.distributed as dist
 import numpy as np
-import kaldiio
+#import kaldiio
 import librosa
 import torchaudio
 import time
@@ -144,10 +144,12 @@ def load_audio_text_image_video(
 
 
 def load_bytes(input):
+    """
     try:
         input = validate_frame_rate(input)
     except:
         pass
+    """
     middle_data = np.frombuffer(input, dtype=np.int16)
     middle_data = np.asarray(middle_data)
     if middle_data.dtype.kind not in "iu":

@@ -28,8 +28,8 @@ using namespace std;
 #if defined(__APPLE__)
 #include <onnxruntime/onnxruntime_cxx_api.h>
 #else
-#include "onnxruntime_run_options_config_keys.h"
-#include "onnxruntime_cxx_api.h"
+#include "onnxruntime/onnxruntime_run_options_config_keys.h"
+#include "onnxruntime/onnxruntime_cxx_api.h"
 #include "itn-model.h"
 #include "itn-processor.h"
 #endif

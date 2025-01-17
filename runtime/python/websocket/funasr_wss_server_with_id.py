@@ -7,7 +7,8 @@ import tracemalloc
 import numpy as np
 import argparse
 import ssl
-
+import base64
+from datetime import datetime
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -193,24 +194,15 @@ async def ws_serve(websocket, path):
             )
             if len(frames_asr_online) > 0 or len(frames_asr) >= 0 or not isinstance(message, str):
                 if not isinstance(message, str):
+                    message = json.loads(message)
+                    message["data"] = base64.b64decode(message["data"])
                     frames.append(message)
-                    duration_ms = len(message) // 32
+                    duration_ms = len(message["data"]) // 32
+                    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                    #print("\033[92mRecving ["+format(message["id"],'10d')+"]: "+current_time_str+"\033[0m")
+                    print("Recving ["+format(message["id"],'10d')+"]: "+current_time_str)
                     websocket.vad_pre_idx += duration_ms
 
-                    # asr online
-                    frames_asr_online.append(message)
-                    websocket.status_dict_asr_online["is_final"] = speech_end_i != -1
-                    if (
-                        len(frames_asr_online) % websocket.chunk_interval == 0
-                        or websocket.status_dict_asr_online["is_final"]
-                    ):
-                        if websocket.mode == "2pass" or websocket.mode == "online":
-                            audio_in = b"".join(frames_asr_online)
-                            try:
-                                await async_asr_online(websocket, audio_in)
-                            except:
-                                print(f"error in asr streaming, {websocket.status_dict_asr_online}")
-                        frames_asr_online = []
                     if speech_start:
                         frames_asr.append(message)
                     # vad online
@@ -224,11 +216,29 @@ async def ws_serve(websocket, path):
                         frames_pre = frames[-beg_bias:]
                         frames_asr = []
                         frames_asr.extend(frames_pre)
+
+                    if speech_end_i == -1:
+                        # asr online
+                        frames_asr_online.append(message)
+                        websocket.status_dict_asr_online["is_final"] = speech_end_i != -1
+                        if (
+                            len(frames_asr_online) % websocket.chunk_interval == 0
+                            or websocket.status_dict_asr_online["is_final"]
+                        ):
+                            if websocket.mode == "2pass" or websocket.mode == "online":
+                                audio_in = {"idstart":frames_asr_online[0]["id"], "idend":frames_asr_online[-1]["id"],
+                                        "data": b"".join([item["data"] for item in frames_asr_online]) }
+                                try:
+                                    await async_asr_online(websocket, audio_in)
+                                except:
+                                    print(f"error in asr streaming, {websocket.status_dict_asr_online}")
+                            frames_asr_online = []
                 # asr punc offline
-                if speech_end_i != -1 or not websocket.is_speaking:
+                if (speech_end_i != -1 or not websocket.is_speaking) and len(frames_asr) > 0:
                     # print("vad end point")
                     if websocket.mode == "2pass" or websocket.mode == "offline":
-                        audio_in = b"".join(frames_asr)
+                        audio_in = {"idstart":frames_asr[0]["id"], "idend":frames_asr[-1]["id"],
+                                "data": b"".join([item["data"] for item in frames_asr])}
                         try:
                             await async_asr(websocket, audio_in)
                         except:
@@ -256,7 +266,7 @@ async def ws_serve(websocket, path):
 
 async def async_vad(websocket, audio_in):
 
-    segments_result = model_vad.generate(input=audio_in, **websocket.status_dict_vad)[0]["value"]
+    segments_result = model_vad.generate(input=audio_in["data"], **websocket.status_dict_vad)[0]["value"]
     # print(segments_result)
 
     speech_start = -1
@@ -268,13 +278,18 @@ async def async_vad(websocket, audio_in):
         speech_start = segments_result[0][0]
     if segments_result[0][1] != -1:
         speech_end = segments_result[0][1]
+    if speech_start != -1 or speech_end != -1:
+        #print("\033[95mvad ["+format(audio_in["id"],'10d')+"]: ["+format(speech_start,'10d')+"] -> ["+format(speech_end,'10')+"]\033[0m")
+        print("vad ["+format(audio_in["id"],'10d')+"]: ["+format(speech_start,'10d')+"] -> ["+format(speech_end,'10')+"]")
     return speech_start, speech_end
 
 
 async def async_asr(websocket, audio_in):
     if len(audio_in) > 0:
         # print(len(audio_in))
-        rec_result = model_asr.generate(input=audio_in, **websocket.status_dict_asr)[0]
+        rec_result = model_asr.generate(input=audio_in["data"], **websocket.status_dict_asr)[0]
+        #print("\033[93moffline ["+format(audio_in["idstart"],'10d')+"]["+format(audio_in["idend"],'10d')+"]:"+rec_result["text"]+"\033[0m")
+        print("offline ["+format(audio_in["idstart"],'10d')+"]["+format(audio_in["idend"],'10d')+"]:"+rec_result["text"])
         # print("offline_asr, ", rec_result)
         if model_punc is not None and len(rec_result["text"]) > 0:
             # print("offline, before punc", rec_result, "cache", websocket.status_dict_punc)
@@ -288,6 +303,9 @@ async def async_asr(websocket, audio_in):
             message = json.dumps(
                 {
                     "mode": mode,
+                    "type": "offline",
+                    "idstart": audio_in["idstart"],
+                    "idend": audio_in["idend"],
                     "text": rec_result["text"],
                     "wav_name": websocket.wav_name,
                     "is_final": websocket.is_speaking,
@@ -300,6 +318,9 @@ async def async_asr(websocket, audio_in):
         message = json.dumps(
             {
                 "mode": mode,
+                "type": "offline",
+                "idstart": audio_in["idstart"],
+                "idend": audio_in["idend"],
                 "text": "",
                 "wav_name": websocket.wav_name,
                 "is_final": websocket.is_speaking,
@@ -311,8 +332,10 @@ async def async_asr_online(websocket, audio_in):
     if len(audio_in) > 0:
         # print(websocket.status_dict_asr_online.get("is_final", False))
         rec_result = model_asr_streaming.generate(
-            input=audio_in, **websocket.status_dict_asr_online
+            input=audio_in["data"], **websocket.status_dict_asr_online
         )[0]
+        #print("\033[94monline  ["+format(audio_in["idstart"],'10d')+"]["+format(audio_in["idend"],'10d')+"]:"+rec_result["text"]+"\033[0m")
+        print("online  ["+format(audio_in["idstart"],'10d')+"]["+format(audio_in["idend"],'10d')+"]:"+rec_result["text"])
         # print("online, ", rec_result)
         if websocket.mode == "2pass" and websocket.status_dict_asr_online.get("is_final", False):
             return
@@ -322,6 +345,9 @@ async def async_asr_online(websocket, audio_in):
             message = json.dumps(
                 {
                     "mode": mode,
+                    "type": "online",
+                    "idstart": audio_in["idstart"],
+                    "idend": audio_in["idend"],
                     "text": rec_result["text"],
                     "wav_name": websocket.wav_name,
                     "is_final": websocket.is_speaking,

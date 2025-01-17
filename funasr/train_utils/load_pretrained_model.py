@@ -36,7 +36,7 @@ def load_pretrained_model(
     logging.info(f"ckpt: {path}")
 
     if oss_bucket is None:
-        ori_state = torch.load(path, map_location=map_location)
+        ori_state = torch.load(path, map_location=map_location, weights_only=True)
     else:
         buffer = BytesIO(oss_bucket.get_object(path).read())
         ori_state = torch.load(buffer, map_location=map_location)

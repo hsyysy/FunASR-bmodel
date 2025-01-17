@@ -26,7 +26,7 @@ from funasr.utils.load_utils import load_audio_text_image_video, extract_fbank
 
 
 if LooseVersion(torch.__version__) >= LooseVersion("1.6.0"):
-    from torch.cuda.amp import autocast
+    from torch.amp import autocast
 else:
     # Nothing to do if torch<1.6.0
     @contextmanager
@@ -161,7 +161,7 @@ class ParaformerStreaming(Paraformer):
                 speech_lengths: (Batch, )
                 ind: int
         """
-        with autocast(False):
+        with autocast("cuda", enabled=False):
 
             # Data augmentation
             if self.specaug is not None and self.training:

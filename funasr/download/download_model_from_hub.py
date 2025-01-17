@@ -79,12 +79,14 @@ def download_from_ms(**kwargs):
             kwargs["jieba_usr_dict"] = os.path.join(model_or_path, "jieba_usr_dict")
     if isinstance(kwargs, DictConfig):
         kwargs = OmegaConf.to_container(kwargs, resolve=True)
+    """
     if os.path.exists(os.path.join(model_or_path, "requirements.txt")):
         requirements = os.path.join(model_or_path, "requirements.txt")
         print(f"Detect model requirements, begin to install it: {requirements}")
         from funasr.utils.install_model_requirements import install_requirements
 
         install_requirements(requirements)
+    """
     if kwargs.get("trust_remote_code", False):
         from funasr.utils.dynamic_import import import_module_from_path
 

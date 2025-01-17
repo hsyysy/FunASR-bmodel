@@ -334,6 +334,7 @@ bool Audio::FfmpegLoad(const char *filename, bool copy2char){
         avcodec_free_context(&codecContext);
         return false;
     }
+    /*
     SwrContext *swr_ctx = swr_alloc_set_opts(
         nullptr, // allocate a new context
         AV_CH_LAYOUT_MONO, // output channel layout (stereo)
@@ -344,6 +345,20 @@ bool Audio::FfmpegLoad(const char *filename, bool copy2char){
         codecContext->sample_rate, // input sample rate
         0, // logging level
         nullptr // parent context
+    );
+    */
+    SwrContext *swr_ctx = nullptr;
+    AVChannelLayout output_layout = AV_CHANNEL_LAYOUT_MONO;
+    int ret = swr_alloc_set_opts2(
+        &swr_ctx,
+	&output_layout,
+        AV_SAMPLE_FMT_S16,
+        dest_sample_rate,
+	&codecContext->ch_layout,
+        codecContext->sample_fmt,
+        codecContext->sample_rate,
+        0,
+        nullptr
     );
     if (swr_ctx == nullptr) {
         LOG(ERROR) << "Could not initialize resampler";
@@ -513,6 +528,7 @@ bool Audio::FfmpegLoad(const char* buf, int n_file_len){
         avcodec_free_context(&codecContext);
         return false;
     }
+    /*
     SwrContext *swr_ctx = swr_alloc_set_opts(
         nullptr, // allocate a new context
         AV_CH_LAYOUT_MONO, // output channel layout (stereo)
@@ -523,6 +539,20 @@ bool Audio::FfmpegLoad(const char* buf, int n_file_len){
         codecContext->sample_rate, // input sample rate
         0, // logging level
         nullptr // parent context
+    );
+    */
+    SwrContext *swr_ctx = nullptr;
+    AVChannelLayout output_layout = AV_CHANNEL_LAYOUT_MONO;
+    int ret = swr_alloc_set_opts2(
+        &swr_ctx,
+        &output_layout,
+        AV_SAMPLE_FMT_S16,
+        dest_sample_rate,
+	&codecContext->ch_layout,
+        codecContext->sample_fmt,
+        codecContext->sample_rate,
+        0,
+        nullptr
     );
     if (swr_ctx == nullptr) {
         LOG(ERROR) << "Could not initialize resampler";

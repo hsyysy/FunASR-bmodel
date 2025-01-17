@@ -652,8 +652,8 @@ class FstImpl {
   FstImpl &operator=(const FstImpl<Arc> &impl) {
     properties_ = impl.properties_;
     type_ = impl.type_;
-    isymbols_ = impl.isymbols_ ? impl.isymbols_->Copy() : nullptr;
-    osymbols_ = impl.osymbols_ ? impl.osymbols_->Copy() : nullptr;
+    isymbols_ = impl.isymbols_ ? std::unique_ptr<fst::SymbolTable>(impl.isymbols_->Copy()) : nullptr;
+    osymbols_ = impl.osymbols_ ? std::unique_ptr<fst::SymbolTable>(impl.osymbols_->Copy()) : nullptr;
     return *this;
   }
 

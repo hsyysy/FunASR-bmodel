@@ -3,16 +3,19 @@ import os
 import time
 import websockets, ssl
 import asyncio
+import base64
 
 # import threading
 import argparse
 import json
 import traceback
 from multiprocessing import Process
+import numpy as np
 
 # from funasr.fileio.datadir_writer import DatadirWriter
 
 import logging
+from datetime import datetime
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -216,7 +219,12 @@ async def record_from_scp(chunk_begin, chunk_size):
 
             beg = i * stride
             data = audio_bytes[beg : beg + stride]
-            message = data
+            sent_timestamps.append([i,time.time()])
+            current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            #print("\033[92mSending ["+format(i,'10d')+"]: "+current_time_str+"\033[0m")
+            print("Sending ["+format(i,'10d')+"]: "+current_time_str)
+            data_dict = {"id":i,"data":base64.b64encode(data).decode('utf-8')}
+            message = json.dumps(data_dict).encode('utf-8')
             # voices.put(message)
             await websocket.send(message)
             if i == chunk_num - 1:
@@ -256,6 +264,7 @@ async def message(id):
         )
     else:
         ibest_writer = None
+    recv_timestamps = []
     try:
         while True:
 
@@ -263,6 +272,22 @@ async def message(id):
             meg = json.loads(meg)
             wav_name = meg.get("wav_name", "demo")
             text = meg["text"]
+            audio_idstart = meg["idstart"]
+            audio_idend = meg["idend"]
+            text_type = meg["type"]
+            #print("recording recv at start = "+str(audio_idstart)+", end = "+str(audio_idend))
+            current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            #print("\033[93mRecving ["+format(audio_idend,'10d') + "]: "+ current_time_str +"\033[0m")
+            print("Recving ["+format(audio_idend,'10d') + "]: "+ current_time_str)
+            if text_type == "online":
+                type_id = 0
+                #print("\033[94monline  ["+format(audio_idstart,'10d')+"]["+format(audio_idend,'10d') + "]: " + text+"\033[0m")
+                print("online  ["+format(audio_idstart,'10d')+"]["+format(audio_idend,'10d') + "]: " + text)
+            else:
+                type_id = 1
+                #print("\033[93moffline ["+format(audio_idstart,'10d')+"]["+format(audio_idend,'10d') + "]: " + text+"\033[0m")
+                print("offline ["+format(audio_idstart,'10d')+"]["+format(audio_idend,'10d') + "]: " + text)
+            recv_timestamps.append([type_id,audio_idstart,audio_idend,time.time(),text])
             timestamp = ""
             offline_msg_done = meg.get("is_final", False)
             if "timestamp" in meg:
@@ -280,8 +305,8 @@ async def message(id):
             if meg["mode"] == "online":
                 text_print += "{}".format(text)
                 text_print = text_print[-args.words_max_print :]
-                os.system("clear")
-                print("\rpid" + str(id) + ": " + text_print)
+                #os.system("clear")
+                #print("\rpid" + str(id) + ": " + text_print)
             elif meg["mode"] == "offline":
                 if timestamp != "":
                     text_print += "{} timestamp: {}".format(text, timestamp)
@@ -290,7 +315,7 @@ async def message(id):
 
                 # text_print = text_print[-args.words_max_print:]
                 # os.system('clear')
-                print("\rpid" + str(id) + ": " + wav_name + ": " + text_print)
+                #print("\rpid" + str(id) + ": " + wav_name + ": " + text_print)
                 offline_msg_done = True
             else:
                 if meg["mode"] == "2pass-online":
@@ -301,8 +326,8 @@ async def message(id):
                     text_print = text_print_2pass_offline + "{}".format(text)
                     text_print_2pass_offline += "{}".format(text)
                 text_print = text_print[-args.words_max_print :]
-                os.system("clear")
-                print("\rpid" + str(id) + ": " + text_print)
+                #os.system("clear")
+                #print("\rpid" + str(id) + ": " + text_print)
                 # offline_msg_done=True
 
     except Exception as e:
@@ -310,6 +335,19 @@ async def message(id):
         # traceback.print_exc()
         # await websocket.close()
 
+    finally:
+        print(text_print)
+        print(len(sent_timestamps))
+        print(len(recv_timestamps))
+        with open("../../../record_text.txt","w") as f:
+            f.write(text_print)
+        with open("../../../record_sent.txt","w") as f:
+            start_time = sent_timestamps[0][1]
+            for item in sent_timestamps:
+                f.write(format(item[0],'04d')+" "+format(item[1]-start_time,'9.4f')+"\n")
+        with open("../../../record_recv.txt","w") as f:
+            for item in recv_timestamps:
+                f.write(format(item[0],'d')+" "+format(item[1],'04d')+" "+format(item[2],'04d')+" "+format(item[3]-start_time,'9.4f')+" "+item[4]+"\n")
 
 async def ws_client(id, chunk_begin, chunk_size):
     if args.audio_in is None:
@@ -346,6 +384,9 @@ def one_thread(id, chunk_begin, chunk_size):
 
 
 if __name__ == "__main__":
+    import time
+    time_beg = time.time()
+    sent_timestamps = []
     # for microphone
     if args.audio_in is None:
         p = Process(target=one_thread, args=(0, 0, 0))
@@ -386,7 +427,9 @@ if __name__ == "__main__":
             p.start()
             process_list.append(p)
 
-        for p in process_list:
+        for i in process_list:
             p.join()
 
         print("end")
+        time_end = time.time()
+        print("Total time = "+str(time_end-time_beg))

@@ -62,7 +62,7 @@ class LinearTransform(nn.Module):
                                   dtype=torch.float32)
         for i in range(self.output_dim):
             line = fread.readline()
-            splits = line.strip().strip('\[\]').strip().split()
+            splits = line.strip('[]').strip().split()
             assert len(splits) == self.input_dim
             cols = torch.tensor([float(item) for item in splits],
                                 dtype=torch.float32)
@@ -121,7 +121,7 @@ class AffineTransform(nn.Module):
                                   dtype=torch.float32)
         for i in range(self.output_dim):
             line = fread.readline()
-            splits = line.strip().strip('\[\]').strip().split()
+            splits = line.strip('[]').strip().split()
             assert len(splits) == self.input_dim
             cols = torch.tensor([float(item) for item in splits],
                                 dtype=torch.float32)
@@ -132,7 +132,7 @@ class AffineTransform(nn.Module):
         linear_bias = self.state_dict()['linear.bias']
         #print(linear_bias.shape)
         bias_line = fread.readline()
-        splits = bias_line.strip().strip('\[\]').strip().split()
+        splits = bias_line.strip('[]').strip().split()
         assert len(splits) == self.output_dim
         new_bias = torch.tensor([float(item) for item in splits],
                                 dtype=torch.float32)
@@ -253,7 +253,7 @@ class FSMNBlock(nn.Module):
         self.dim = int(fsmn_split[1])
 
         params_line = fread.readline()
-        params_split = params_line.strip().strip('\[\]').strip().split()
+        params_split = params_line.strip('[]').strip().split()
         assert len(params_split) == 12
         assert params_split[0] == '<LearnRateCoef>'
         assert params_split[2] == '<LOrder>'
@@ -274,7 +274,7 @@ class FSMNBlock(nn.Module):
         for i in range(self.lorder):
             print('read conv_left weight -- %d' % i)
             line = fread.readline()
-            splits = line.strip().strip('\[\]').strip().split()
+            splits = line.strip('[]').strip().split()
             assert len(splits) == self.dim
             cols = torch.tensor([float(item) for item in splits],
                                 dtype=torch.float32)
@@ -297,7 +297,7 @@ class FSMNBlock(nn.Module):
             for i in range(self.rorder):
                 print('read conv_right weight -- %d' % i)
                 line = fread.readline()
-                splits = line.strip().strip('\[\]').strip().split()
+                splits = line.strip('[]').strip().split()
                 assert len(splits) == self.dim
                 cols = torch.tensor([float(item) for item in splits],
                                     dtype=torch.float32)
