@@ -60,10 +60,10 @@ ParaformerOnline::ParaformerOnline(Model* offline_handle, std::vector<int> chunk
         svs_handle->tail_alphas);
     }
     */
-    InitCache();
     for (int i=0;i<16;i++){
         bm_malloc_device_byte(bm_handle, &cache_mem[i], 5120*sizeof(float));
     }
+    InitCache();
 }
 
 void ParaformerOnline::InitOnline(
@@ -118,9 +118,11 @@ void ParaformerOnline::InitOnline(
 
     // other vars
     sqrt_factor = std::sqrt(encoder_size);
+    /*
     for(int i=0; i<fsmn_lorder*fsmn_dims; i++){
         fsmn_init_cache_.emplace_back(0);
     }
+    */
     chunk_len = chunk_size[1]*frame_shift*lfr_n*offline_handle_->GetAsrSampleRate()/1000;
 
     frame_sample_length_ = offline_handle_->GetAsrSampleRate() / 1000 * frame_length;
@@ -378,12 +380,15 @@ void ParaformerOnline::InitCache(){
     }
 
     // fsmn cache
+    /*
 #ifdef _WIN_X86
     Ort::MemoryInfo m_memoryInfo = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
 #else
     Ort::MemoryInfo m_memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 #endif
     const int64_t fsmn_shape_[3] = {1, fsmn_dims, fsmn_lorder};
+    */
+    float value = 0.0;
     for(int l=0; l<fsmn_layers; l++){
         /*
         Ort::Value onnx_fsmn_cache = Ort::Value::CreateTensor<float>(
@@ -394,7 +399,7 @@ void ParaformerOnline::InitCache(){
             3);
         decoder_onnx.emplace_back(std::move(onnx_fsmn_cache));
         */
-        bm_memcpy_s2d(bm_handle, cache_mem[l], fsmn_init_cache_.data());
+        bm_memset_device_ext(bm_handle, (void *)&value, 4, cache_mem[l]);
     }
 };
 
