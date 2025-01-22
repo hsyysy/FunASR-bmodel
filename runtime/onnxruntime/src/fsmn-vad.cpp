@@ -324,6 +324,7 @@ void FsmnVad::Test() {
 }
 
 FsmnVad::~FsmnVad() {
+    free(net_names);
     if(p_bmrt!=NULL){
         bmrt_destroy(p_bmrt);
     }

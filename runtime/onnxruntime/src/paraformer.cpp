@@ -691,6 +691,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         }
 
         // decoder
+        free(net_names);
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
@@ -731,6 +732,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
 
         // free device memory
         // free encoder
+        free(net_names);
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_encoder, net_names[0]);
@@ -742,6 +744,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
             bm_free_device(bm_handle, output_tensors_encoder[i].device_mem);
         }
         // free decoder
+        free(net_names);
         net_names = NULL;
         bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
@@ -752,6 +755,7 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         for (int i = 0; i < net_info->output_num; ++i) {
             bm_free_device(bm_handle, output_tensors_decoder[i].device_mem);
         }
+        free(net_names);
 
         result = BeamSearch(wfst_decoder, output_data.data(), decoder_out_lens, decoder_out_vocab);
         if (input_finished) {

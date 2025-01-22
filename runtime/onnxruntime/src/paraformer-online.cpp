@@ -595,6 +595,7 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             */
 
             //bmrt
+            free(net_names);
             net_names = NULL;
             bmrt_get_network_names(p_bmrt_online_decoder, &net_names);
             net_info = bmrt_get_network_info(p_bmrt_online_decoder, net_names[0]);
@@ -669,6 +670,7 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             for (int i = 0; i < net_info->output_num; ++i) {
                 bm_free_device(bm_handle, output_tensors_decoder[i].device_mem);
             }
+            free(net_names);
             net_names = NULL;
             bmrt_get_network_names(p_bmrt_online_encoder, &net_names);
             net_info = bmrt_get_network_info(p_bmrt_online_encoder, net_names[0]);
@@ -764,6 +766,7 @@ string ParaformerOnline::Forward(float* din, int len, bool input_finished, const
 
 ParaformerOnline::~ParaformerOnline()
 {
+    free(net_names);
     for (int i=0;i<16;i++){
         bm_free_device(bm_handle, cache_mem[i]);
     }
