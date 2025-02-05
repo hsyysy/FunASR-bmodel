@@ -600,8 +600,9 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             bmrt_get_network_names(p_bmrt_online_decoder, &net_names);
             net_info = bmrt_get_network_info(p_bmrt_online_decoder, net_names[0]);
             assert(NULL != net_info);
-            // input tensor of decoder
+            // input and output tensor of decoder
             bm_tensor_t input_tensors_decoder[net_info->input_num];
+            bm_tensor_t output_tensors_decoder[net_info->output_num];
 
             bmrt_tensor(&input_tensors_decoder[0], p_bmrt_online_decoder, net_info->input_dtypes[0], {3, {enc_shape.dims[0], enc_shape.dims[1], enc_shape.dims[2]}});
             status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[0].device_mem, enc_data.data(), enc_count*sizeof(float));
@@ -621,10 +622,10 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
 
             for (int i=0;i<16;i++){
                 bmrt_tensor_with_device(&input_tensors_decoder[i+4], cache_mem[i], net_info->input_dtypes[i+4], {3, {1,512,10}});
+                bmrt_tensor_with_device(&output_tensors_decoder[i+2], cache_mem[i], net_info->output_dtypes[i+2], {3, {1,512,10}});
             }
-            // output tensor of decoder
-            bm_tensor_t output_tensors_decoder[net_info->output_num];
-            for (int i=0;i<net_info->output_num;i++) {
+
+            for (int i=0;i<2;i++) {
                 status = bm_malloc_device_byte(bm_handle, &output_tensors_decoder[i].device_mem, net_info->max_output_bytes[i]);
                 assert(BM_SUCCESS == status);
             }
@@ -651,11 +652,10 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
                 LOG(ERROR)<<e.what();
                 return result;
             }
-            */
             for(int l=0;l<fsmn_layers;l++){
-                assert(BM_SUCCESS == bm_memcpy_d2d_byte(bm_handle, cache_mem[l], 0, output_tensors_decoder[l+2].device_mem, 0, 5120*sizeof(float)));
-                //decoder_onnx.emplace_back(std::move(decoder_tensor[2+l]));
+                decoder_onnx.emplace_back(std::move(decoder_tensor[2+l]));
             }
+            */
 
             /*
             std::vector<int64_t> decoder_shape = decoder_tensor[0].GetTensorTypeAndShapeInfo().GetShape();
@@ -667,7 +667,7 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             for (int i = 0; i < 4; ++i) {
                 bm_free_device(bm_handle, input_tensors_decoder[i].device_mem);
             }
-            for (int i = 0; i < net_info->output_num; ++i) {
+            for (int i = 0; i < 2; ++i) {
                 bm_free_device(bm_handle, output_tensors_decoder[i].device_mem);
             }
             free(net_names);
