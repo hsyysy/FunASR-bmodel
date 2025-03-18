@@ -151,7 +151,9 @@ class AutoModel:
         # if spk_model is not None, build spk model else None
         spk_model = kwargs.get("spk_model", None)
         spk_kwargs = {} if kwargs.get("spk_kwargs", {}) is None else kwargs.get("spk_kwargs", {})
-        cb_kwargs = {} if spk_kwargs.get("cb_kwargs", {}) is None else spk_kwargs.get("cb_kwargs", {})
+        cb_kwargs = (
+            {} if spk_kwargs.get("cb_kwargs", {}) is None else spk_kwargs.get("cb_kwargs", {})
+        )
         if spk_model is not None:
             logging.info("Building SPK model.")
             spk_kwargs["model"] = spk_model
