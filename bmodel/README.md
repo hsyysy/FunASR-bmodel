@@ -82,6 +82,6 @@ C++编译可参考[runtime/onnxruntime/readme.md](../runtime/onnxruntime/readme.
 ### 4.3 在线识别
 Python在线识别可参考run_server.sh开启服务，通过run_client.sh测试
 
-C++编译可参考[runtime/websocket/readme.md](../runtime/websocket/readme_zh.md)编译，执行cpp_server.sh开启服务，通过cpp_client.sh测试，由于目前online模型暂未适配C++，因此online识别部分由cpu通过onnx推理完成。(在原[FunASR](https://github.com/modelscope/FunASR)仓库运行bmodel/export_onnx.py可转出onnx模型)
+C++编译可参考[runtime/websocket/readme.md](../runtime/websocket/readme_zh.md)编译，执行cpp_server.sh开启服务，通过cpp_client.sh测试。
 
 另有2pass.sh脚本用于本地测试在线识别服务。
