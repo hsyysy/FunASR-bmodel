@@ -5,5 +5,5 @@ rotary_embedding_torch
 omegaconf
 kaldiio
 librosa
-hydra
+hydra-core
 umap-learn
