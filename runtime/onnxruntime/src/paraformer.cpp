@@ -17,6 +17,11 @@ Paraformer::Paraformer()
  hw_env_(ORT_LOGGING_LEVEL_ERROR, "paraformer_hw"),hw_session_options{} {
     status = bm_dev_request(&bm_handle, DEV_ID);
     assert(BM_SUCCESS == status);
+
+    unsigned p_chipid;
+    bm_get_chipid(bm_handle, &p_chipid);
+    if (p_chipid == 0x1686a200)
+        is_1688 = true;
 }
 
 // bmrt
@@ -596,31 +601,38 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
 
         // input tensor of encoder
         bm_tensor_t input_tensors_encoder[net_info->input_num];
+        input_tensors_encoder[0].shape = {3, {1, num_frames, feat_dim}};
+        input_tensors_encoder[1].shape = {1, {1}};
+        for (int i=0;i<net_info->input_num;i++){
+            input_tensors_encoder[i].dtype = net_info->input_dtypes[i];
+            if (is_1688) {
+                size_t size = bmrt_tensor_bytesize(&input_tensors_encoder[i]);
+                bm_malloc_device_byte(bm_handle, &input_tensors_encoder[i].device_mem, size);
+            } else
+                input_tensors_encoder[i].device_mem = net_info->stages[0].input_mems[i];
+            input_tensors_encoder[i].st_mode = BM_STORE_1N;
+        }
 
-        bmrt_tensor(&input_tensors_encoder[0], p_bmrt_offline_encoder, net_info->input_dtypes[0], {3, {1, num_frames, feat_dim}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_encoder[0].device_mem, wav_feats.data(), wav_feats.size()*sizeof(float));
         assert(BM_SUCCESS == status);
 
-        bmrt_tensor(&input_tensors_encoder[1], p_bmrt_offline_encoder, net_info->input_dtypes[1], {1, {1}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_encoder[1].device_mem, &num_frames, sizeof(int32_t));
         assert(BM_SUCCESS == status);
 
         // output tensor of encoder
         bm_tensor_t output_tensors_encoder[net_info->output_num];
-        /*
-        for (int i=0;i<4;i++) {
-            status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[i].device_mem, net_info->max_output_bytes[i]);
-            assert(BM_SUCCESS == status);
+        output_tensors_encoder[0].shape = {3, {1,num_frames,512}};
+        output_tensors_encoder[1].shape = {3, {1,num_frames+1,512}};
+        output_tensors_encoder[2].shape = {2, {1,num_frames+1}};
+        output_tensors_encoder[3].shape = {1, {1}};
+        for (int i=0;i<net_info->output_num;i++){
+            output_tensors_encoder[i].dtype = net_info->output_dtypes[i];
+            if (is_1688) {
+                size_t size = bmrt_tensor_bytesize(&output_tensors_encoder[i]);
+                bm_malloc_device_byte(bm_handle, &output_tensors_encoder[i].device_mem, size);
+            }else
+                output_tensors_encoder[i].device_mem = net_info->stages[0].output_mems[i];
         }
-        */
-        status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[0].device_mem, 1*num_frames*512*sizeof(float));
-        assert(BM_SUCCESS == status);
-        status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[1].device_mem, 1*(num_frames+1)*512*sizeof(float));
-        assert(BM_SUCCESS == status);
-        status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[2].device_mem, 1*(num_frames+1)*sizeof(float));
-        assert(BM_SUCCESS == status);
-        status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[3].device_mem, 1*sizeof(float));
-        assert(BM_SUCCESS == status);
 
         // forward
         ret = bmrt_launch_tensor_ex(p_bmrt_offline_encoder, net_names[0], input_tensors_encoder, 2, output_tensors_encoder, 4, true, false);
@@ -696,28 +708,43 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
         net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
         assert(NULL != net_info);
-        bm_tensor_t input_tensors_decoder[5];
 
-        bmrt_tensor_with_device(&input_tensors_decoder[0], output_tensors_encoder[0].device_mem, net_info->input_dtypes[0], {3, {batch_size, num_frames, 512}});
+        bm_tensor_t input_tensors_decoder[net_info->input_num];
+        input_tensors_decoder[0].shape = {3, {batch_size, num_frames, 512}};
+        input_tensors_decoder[1].shape = {1, {batch_size}};
+        input_tensors_decoder[2].shape = {3, {batch_size, token_num_int, feature_size}};
+        input_tensors_decoder[3].shape = {1, {batch_size}};
+        input_tensors_decoder[4].shape = {3, {batch_size, hw_emb_count, 512}};
+        for(int i=0;i<net_info->input_num;i++){
+            input_tensors_decoder[i].dtype = net_info->input_dtypes[i];
+            if (i>1) {
+                if (is_1688) {
+                    size_t size = bmrt_tensor_bytesize(&input_tensors_decoder[i]);
+                    bm_malloc_device_byte(bm_handle, &input_tensors_decoder[i].device_mem, size);
+                } else {
+                    input_tensors_decoder[i].device_mem = net_info->stages[0].input_mems[i];
+                }
+            }
+            input_tensors_decoder[i].st_mode = BM_STORE_1N;
+        }
+        input_tensors_decoder[0].device_mem = output_tensors_encoder[0].device_mem;
+        input_tensors_decoder[1].device_mem = input_tensors_encoder[1].device_mem;
 
-        bmrt_tensor_with_device(&input_tensors_decoder[1], input_tensors_encoder[1].device_mem, net_info->input_dtypes[1], {1, {batch_size}});
-
-        bmrt_tensor(&input_tensors_decoder[2], p_bmrt_offline_decoder, net_info->input_dtypes[2], {3, {batch_size, token_num_int, feature_size}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[2].device_mem, pre_acoustic_embeds2.data(), pre_acoustic_embeds2.size()*sizeof(float));
         assert(BM_SUCCESS == status);
 
-        bmrt_tensor(&input_tensors_decoder[3], p_bmrt_offline_decoder, net_info->input_dtypes[3], {1, {batch_size}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[3].device_mem, pre_token_length_rounded.data(), batch_size*sizeof(int32_t));
         assert(BM_SUCCESS == status);
 
-        bmrt_tensor(&input_tensors_decoder[4], p_bmrt_offline_decoder, net_info->input_dtypes[4], {3, {batch_size, hw_emb_count, 512}});
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[4].device_mem, hw_embed.data(), batch_size*hw_emb_count*512*sizeof(float));
         assert(BM_SUCCESS == status);
 
         bm_tensor_t output_tensors_decoder[1];
-
-        status = bm_malloc_device_byte(bm_handle, &output_tensors_decoder[0].device_mem, net_info->max_output_bytes[0]);
-        assert(BM_SUCCESS == status);
+        if (is_1688){
+            status = bm_malloc_device_byte(bm_handle, &output_tensors_decoder[0].device_mem, net_info->max_output_bytes[0]);
+            assert(BM_SUCCESS == status);
+        } else
+            output_tensors_decoder[0].device_mem = net_info->stages[0].output_mems[0];
 
         ret = bmrt_launch_tensor_ex(p_bmrt_offline_decoder, net_names[0], input_tensors_decoder, 5, output_tensors_decoder, 1, true, false);
         assert(true == ret);
@@ -731,29 +758,31 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         auto decoder_out_vocab = decoder_out_shape.dims[2];
 
         // free device memory
-        // free encoder
-        free(net_names);
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt_offline_encoder, net_names[0]);
-        assert(NULL != net_info);
-        for (int i = 0; i < net_info->input_num; ++i) {
-            bm_free_device(bm_handle, input_tensors_encoder[i].device_mem);
-        }
-        for (int i = 0; i < net_info->output_num; ++i) {
-            bm_free_device(bm_handle, output_tensors_encoder[i].device_mem);
-        }
-        // free decoder
-        free(net_names);
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
-        assert(NULL != net_info);
-        for (int i = 2; i < net_info->input_num; ++i) {
-            bm_free_device(bm_handle, input_tensors_decoder[i].device_mem);
-        }
-        for (int i = 0; i < net_info->output_num; ++i) {
-            bm_free_device(bm_handle, output_tensors_decoder[i].device_mem);
+        if (is_1688){
+            // free encoder
+            free(net_names);
+            net_names = NULL;
+            bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
+            net_info = bmrt_get_network_info(p_bmrt_offline_encoder, net_names[0]);
+            assert(NULL != net_info);
+            for (int i = 0; i < net_info->input_num; ++i) {
+                bm_free_device(bm_handle, input_tensors_encoder[i].device_mem);
+            }
+            for (int i = 0; i < net_info->output_num; ++i) {
+                bm_free_device(bm_handle, output_tensors_encoder[i].device_mem);
+            }
+            // free decoder
+            free(net_names);
+            net_names = NULL;
+            bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
+            net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
+            assert(NULL != net_info);
+            for (int i = 2; i < net_info->input_num; ++i) {
+                bm_free_device(bm_handle, input_tensors_decoder[i].device_mem);
+            }
+            for (int i = 0; i < net_info->output_num; ++i) {
+                bm_free_device(bm_handle, output_tensors_decoder[i].device_mem);
+            }
         }
         free(net_names);
 
@@ -902,13 +931,24 @@ std::vector<std::vector<float>> Paraformer::CompileHotwordEmbedding(std::string 
         net_info = bmrt_get_network_info(p_bmrt_hw, net_names[0]);
         assert(NULL != net_info);
         bm_tensor_t input_tensors_hw[1];
-        bmrt_tensor(&input_tensors_hw[0], p_bmrt_hw, net_info->input_dtypes[0], {2, {hotword_size, max_hotword_len}});
+        input_tensors_hw[0].shape = {2, {hotword_size, max_hotword_len}};
+        input_tensors_hw[0].dtype = net_info->input_dtypes[0];
+        if (is_1688) {
+            size_t size = bmrt_tensor_bytesize(&input_tensors_hw[0]);
+            bm_malloc_device_byte(bm_handle, &input_tensors_hw[0].device_mem, size);
+        } else
+            input_tensors_hw[0].device_mem = net_info->stages[0].input_mems[0];
+        input_tensors_hw[0].st_mode = BM_STORE_1N;
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_hw[0].device_mem, (int32_t*)hotword_matrix.data(), hotword_size*max_hotword_len*sizeof(int32_t));
         assert(BM_SUCCESS == status);
 
         bm_tensor_t output_tensors_hw[1];
-        status = bm_malloc_device_byte(bm_handle, &output_tensors_hw[0].device_mem, net_info->max_output_bytes[0]);
-        assert(BM_SUCCESS == status);
+        if (is_1688) {
+            output_tensors_hw[0].dtype - net_info->output_dtypes[0];
+            size_t size = bmrt_tensor_bytesize(&output_tensors_hw[0]);
+            bm_malloc_device_byte(bm_handle, &output_tensors_hw[0].device_mem, net_info->max_output_bytes[0]);
+        } else
+            output_tensors_hw[0].device_mem = net_info->stages[0].output_mems[0];
 
         //forward
         ret = bmrt_launch_tensor_ex(p_bmrt_hw, net_names[0], input_tensors_hw, 1, output_tensors_hw, 1, true, false);
@@ -941,11 +981,13 @@ std::vector<std::vector<float>> Paraformer::CompileHotwordEmbedding(std::string 
             embedding.insert(embedding.begin(), floatData.begin() + start_pos, floatData.begin() + start_pos + embedding_dim);
             result.push_back(embedding);
         }
-        for (int i = 0; i < net_info->input_num; ++i) {
-            bm_free_device(bm_handle, input_tensors_hw[i].device_mem);
-        }
-        for (int i = 0; i < net_info->output_num; ++i) {
-            bm_free_device(bm_handle, output_tensors_hw[i].device_mem);
+        if (is_1688){
+            for (int i = 0; i < net_info->input_num; ++i) {
+                bm_free_device(bm_handle, input_tensors_hw[i].device_mem);
+            }
+            for (int i = 0; i < net_info->output_num; ++i) {
+                bm_free_device(bm_handle, output_tensors_hw[i].device_mem);
+            }
         }
     }
     catch (std::exception const &e)

@@ -93,6 +93,7 @@ namespace funasr {
         bm_handle_t bm_handle;
         bm_status_t status;
         bool ret;
+        bool is_1688 = false;
 
         void* p_bmrt_online_encoder = NULL;
         void* p_bmrt_online_decoder = NULL;

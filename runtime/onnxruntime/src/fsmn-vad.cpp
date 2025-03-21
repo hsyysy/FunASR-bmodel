@@ -16,6 +16,10 @@ void FsmnVad::InitVad(const std::string &vad_model, const std::string &vad_cmvn,
     LoadCmvn(vad_cmvn.c_str());
     LoadConfigFromYaml(vad_config.c_str());
     InitCache();
+    unsigned p_chipid;
+    bm_get_chipid(bm_handle, &p_chipid);
+    if (p_chipid == 0x1686a200)
+        is_1688 = true;
 }
 
 void FsmnVad::LoadConfigFromYaml(const char* filename){
@@ -112,19 +116,37 @@ void FsmnVad::Forward(
 
     // input tensor of vad
     bm_tensor_t input_tensors_vad[net_info->input_num];
-    bmrt_tensor(&input_tensors_vad[0], p_bmrt, net_info->input_dtypes[0], {3, {1, num_frames, feature_dim}});
+    input_tensors_vad[0].shape = {3, {1, num_frames, feature_dim}};
+    input_tensors_vad[0].dtype = net_info->input_dtypes[0];
+    if (is_1688){
+        size_t size = bmrt_tensor_bytesize(&input_tensors_vad[0]);
+        bm_malloc_device_byte(bm_handle, &input_tensors_vad[0].device_mem, size);
+    }else
+        input_tensors_vad[0].device_mem = net_info->stages[0].input_mems[0];
+    input_tensors_vad[0].st_mode = BM_STORE_1N;
+
     status = bm_memcpy_s2d_partial(bm_handle, input_tensors_vad[0].device_mem, vad_feats.data(), vad_feats.size()*sizeof(float));
     assert(BM_SUCCESS == status);
 
-    for (int i=0;i<4;i++){
-        bmrt_tensor(&input_tensors_vad[i+1], p_bmrt, net_info->input_dtypes[i+1], {4, {1, 128, 19, 1}});
-        status = bm_memcpy_s2d_partial(bm_handle, input_tensors_vad[i+1].device_mem, (*in_cache)[i].data(), (*in_cache)[i].size()*sizeof(float));
+    for (int i=1;i<5;i++){
+        input_tensors_vad[i].shape = {4, {1, 128, 19, 1}};
+        input_tensors_vad[i].dtype = net_info->input_dtypes[i];
+        if (is_1688){
+            size_t size = bmrt_tensor_bytesize(&input_tensors_vad[i]);
+            bm_malloc_device_byte(bm_handle, &input_tensors_vad[i].device_mem, size);
+        } else
+            input_tensors_vad[i].device_mem = net_info->stages[0].input_mems[i];
+        input_tensors_vad[i].st_mode = BM_STORE_1N;
+        bm_memcpy_s2d_partial(bm_handle, input_tensors_vad[i].device_mem, (*in_cache)[i-1].data(), (*in_cache)[i-1].size()*sizeof(float));
     }
     // output tensor of vad
     bm_tensor_t output_tensors_vad[net_info->output_num];
     for (int i=0;i<net_info->output_num;i++) {
-        status = bm_malloc_device_byte(bm_handle, &output_tensors_vad[i].device_mem, net_info->max_output_bytes[i]);
-        assert(BM_SUCCESS == status);
+        if (is_1688){
+            status = bm_malloc_device_byte(bm_handle, &output_tensors_vad[i].device_mem, net_info->max_output_bytes[i]);
+            assert(BM_SUCCESS == status);
+        } else
+            output_tensors_vad[i].device_mem = net_info->stages[0].output_mems[i];
     }
 
     // 4. Onnx infer
@@ -179,11 +201,13 @@ void FsmnVad::Forward(
         memcpy((*in_cache)[i-1].data(), data.data(), sizeof(float) * 128*19);
         }
     }
-    for (int i = 0; i < net_info->output_num; ++i) {
-        bm_free_device(bm_handle, input_tensors_vad[i].device_mem);
-    }
-    for (int i = 0; i < net_info->output_num; ++i) {
-        bm_free_device(bm_handle, output_tensors_vad[i].device_mem);
+    if (is_1688){
+        for (int i = 0; i < net_info->output_num; ++i) {
+            bm_free_device(bm_handle, input_tensors_vad[i].device_mem);
+        }
+        for (int i = 0; i < net_info->output_num; ++i) {
+            bm_free_device(bm_handle, output_tensors_vad[i].device_mem);
+        }
     }
 }
 

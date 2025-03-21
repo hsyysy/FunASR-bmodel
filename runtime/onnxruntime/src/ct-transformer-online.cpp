@@ -33,6 +33,11 @@ void CTTransformerOnline::InitPunc(const std::string &punc_model, const std::str
         net_info = bmrt_get_network_info(p_bmrt, net_names[0]);
         assert(NULL != net_info);
         LOG(INFO) << "Successfully load model from " << punc_model;
+
+        unsigned p_chipid;
+        bm_get_chipid(bm_handle, &p_chipid);
+        if (p_chipid == 0x1686a200)
+            is_1688 = true;
     }
     catch (std::exception const &e) {
         //LOG(ERROR) << "Error when load punc onnx model: " << e.what();
@@ -227,19 +232,31 @@ vector<int> CTTransformerOnline::Infer(vector<int32_t> input_data, int nCacheSiz
     */
     // input tensor of punc
     bm_tensor_t input_tensors_punc[net_info->input_num];
-    bmrt_tensor(&input_tensors_punc[0], p_bmrt, net_info->input_dtypes[0], {2, {1, (int)input_data.size()}});
+    input_tensors_punc[0].shape = {2, {1, (int)input_data.size()}};
+    input_tensors_punc[1].shape = {1, {1}};
+    for(int i=0;i<net_info->input_num;i++){
+        input_tensors_punc[i].dtype = net_info->input_dtypes[i];
+        if (is_1688){
+            size_t size = bmrt_tensor_bytesize(&input_tensors_punc[i]);
+            bm_malloc_device_byte(bm_handle, &input_tensors_punc[i].device_mem, size);
+        } else
+            input_tensors_punc[i].device_mem = net_info->stages[0].input_mems[i];
+        input_tensors_punc[i].st_mode = BM_STORE_1N;
+    }
     status = bm_memcpy_s2d_partial(bm_handle, input_tensors_punc[0].device_mem, input_data.data(), input_data.size()*sizeof(int32_t));
     assert(BM_SUCCESS == status);
 
-    bmrt_tensor(&input_tensors_punc[1], p_bmrt, net_info->input_dtypes[1], {1, {1}});
     int32_t tl[1] = {static_cast<int32_t>(input_data.size())};
     status = bm_memcpy_s2d_partial(bm_handle, input_tensors_punc[1].device_mem, tl, sizeof(int32_t));
     assert(BM_SUCCESS == status);
 
     // output tensor of punc
     bm_tensor_t output_tensors_punc[net_info->output_num];
-    status = bm_malloc_device_byte(bm_handle, &output_tensors_punc[0].device_mem, net_info->max_output_bytes[0]);
-    assert(BM_SUCCESS == status);
+    if (is_1688){
+        status = bm_malloc_device_byte(bm_handle, &output_tensors_punc[0].device_mem, net_info->max_output_bytes[0]);
+        assert(BM_SUCCESS == status);
+    } else
+        output_tensors_punc[0].device_mem = net_info->stages[0].output_mems[0];
         
     try {
         // forward
@@ -266,11 +283,13 @@ vector<int> CTTransformerOnline::Infer(vector<int32_t> input_data, int nCacheSiz
             punction.push_back(index);
         }
         // free memory
-        for (int i = 0; i < net_info->output_num; ++i) {
-            bm_free_device(bm_handle, input_tensors_punc[i].device_mem);
-        }
-        for (int i = 0; i < net_info->output_num; ++i) {
-            bm_free_device(bm_handle, output_tensors_punc[i].device_mem);
+        if (is_1688) {
+            for (int i = 0; i < net_info->output_num; ++i) {
+                bm_free_device(bm_handle, input_tensors_punc[i].device_mem);
+            }
+            for (int i = 0; i < net_info->output_num; ++i) {
+                bm_free_device(bm_handle, output_tensors_punc[i].device_mem);
+            }
         }
     }
     catch (std::exception const &e)

@@ -51,7 +51,8 @@ namespace funasr {
             int fsmn_lorder_,
             int fsmn_dims_,
             float cif_threshold_,
-            float tail_alphas_);
+            float tail_alphas_,
+            bool is_1688);
 
         void StartUtterance()
         {
@@ -85,6 +86,7 @@ namespace funasr {
         int fsmn_dims = 512;
         float cif_threshold = 1.0;
         float tail_alphas = 0.45;
+        bool is_1688;
 
         // configs
         int feat_dims = lfr_m*n_mels;

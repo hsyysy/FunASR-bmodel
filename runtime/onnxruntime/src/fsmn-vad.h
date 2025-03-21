@@ -69,6 +69,7 @@ private:
     void LfrCmvn(std::vector<std::vector<float>> &vad_feats);
     void LoadCmvn(const char *filename);
     void InitCache();
+    bool is_1688;
 
 };
 

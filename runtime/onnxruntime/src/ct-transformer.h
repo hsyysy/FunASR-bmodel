@@ -23,6 +23,7 @@ private:
 	std::shared_ptr<Ort::Session> m_session;
     Ort::Env env_;
     Ort::SessionOptions session_options;
+    bool is_1688;
 public:
 
 	CTTransformer();
