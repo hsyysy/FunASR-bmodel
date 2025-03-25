@@ -641,9 +641,6 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
                 output_tensors_decoder[i+2].device_mem = cache_mem[i];
             }
 
-            status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[0].device_mem, enc_data.data(), enc_count*sizeof(float));
-            assert(BM_SUCCESS == status);
-
             status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[1].device_mem, &enc_shape.dims[1], 1*sizeof(int));
             assert(BM_SUCCESS == status);
 
