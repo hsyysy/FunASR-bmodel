@@ -546,11 +546,10 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             }
         }
         */
-        std::vector<std::vector<float>> enc_vec(enc_shape.dims[1], std::vector<float>(enc_shape.dims[2]));
+        std::vector<std::vector<float>> enc_vec;
+        enc_vec.reserve(enc_shape.dims[1]);
         for (int i = 0; i < enc_shape.dims[1]; i++) {
-            for (int j = 0; j < enc_shape.dims[2]; j++) {
-                enc_vec[i][j] = enc_data[i * enc_shape.dims[2] + j];
-            }
+            enc_vec.emplace_back(enc_data.begin() + i*enc_shape.dims[2], enc_data.begin() + (i+1)*enc_shape.dims[2]);
         }
 
         // get alpha_vec
