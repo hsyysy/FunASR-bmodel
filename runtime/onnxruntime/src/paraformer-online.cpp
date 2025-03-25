@@ -569,28 +569,10 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
         
         if(list_frame.size()>0){
             /*
-            std::vector<int64_t> shape = {enc_shape.dims[0], enc_shape.dims[1], enc_shape.dims[2]};
-            Ort::Value decoder_input0 = Ort::Value::CreateTensor<float>(
-                m_memoryInfo,
-                enc_data.data(),
-                enc_count,
-                shape.data(),
-                shape.size()
-            );
             // enc
-            //decoder_onnx.insert(decoder_onnx.begin(), std::move(encoder_tensor[0]));
-            decoder_onnx.insert(decoder_onnx.begin(), std::move(decoder_input0));
-
-            const int64_t encoder_length_shape[1] = {1};
-            std::vector<int32_t> encoder_length(1, enc_shape.dims[1]);
-            Ort::Value decoder_input1 = Ort::Value::CreateTensor<int32_t>(
-                m_memoryInfo,
-                encoder_length.data(),
-                encoder_length.size(),
-                encoder_length_shape, 1);
+            decoder_onnx.insert(decoder_onnx.begin(), std::move(encoder_tensor[0]));
             // enc_lens
-            //decoder_onnx.insert(decoder_onnx.begin()+1, std::move(encoder_tensor[1]));
-            decoder_onnx.insert(decoder_onnx.begin()+1, std::move(decoder_input1));
+            decoder_onnx.insert(decoder_onnx.begin()+1, std::move(encoder_tensor[1]));
 
             // acoustic_embeds
             const int64_t emb_shape_[3] = {1, (int64_t)list_frame.size(), (int64_t)list_frame[0].size()};
@@ -627,7 +609,7 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             assert(NULL != net_info);
             // input and output tensor of decoder
             bm_tensor_t input_tensors_decoder[net_info->input_num];
-            input_tensors_decoder[0].shape = {3, {enc_shape.dims[0], enc_shape.dims[1], enc_shape.dims[2]}};
+            input_tensors_decoder[0].shape = output_tensors_encoder[0].shape;
             input_tensors_decoder[1].shape = {1, {1}};
             input_tensors_decoder[2].shape = {3, {1, static_cast<int>(list_frame.size()), static_cast<int>(list_frame[0].size())}};
             input_tensors_decoder[3].shape = {1, {1}};
@@ -637,7 +619,8 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
                 input_tensors_decoder[i].dtype = net_info->input_dtypes[i];
                 input_tensors_decoder[i].st_mode = BM_STORE_1N;
             }
-            for(int i=0;i<4;i++){
+            input_tensors_decoder[0].device_mem = output_tensors_encoder[0].device_mem;
+            for(int i=1;i<4;i++){
                 if (is_1688){
                     size_t size = bmrt_tensor_bytesize(&input_tensors_decoder[i]);
                     bm_malloc_device_byte(bm_handle, &input_tensors_decoder[i].device_mem, size);
@@ -706,7 +689,7 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             result = offline_handle_->GreedySearch(float_data.data(), list_frame.size(), decoder_out_shape.dims[2]);
 
             if (is_1688){
-                for (int i = 0; i < 4; ++i) {
+                for (int i = 1; i < 4; ++i) {
                     bm_free_device(bm_handle, input_tensors_decoder[i].device_mem);
                 }
                 for (int i = 0; i < 2; ++i) {
