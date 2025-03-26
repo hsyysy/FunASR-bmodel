@@ -944,8 +944,6 @@ std::vector<std::vector<float>> Paraformer::CompileHotwordEmbedding(std::string 
 
         bm_tensor_t output_tensors_hw[1];
         if (is_1688) {
-            output_tensors_hw[0].dtype - net_info->output_dtypes[0];
-            size_t size = bmrt_tensor_bytesize(&output_tensors_hw[0]);
             bm_malloc_device_byte(bm_handle, &output_tensors_hw[0].device_mem, net_info->max_output_bytes[0]);
         } else
             output_tensors_hw[0].device_mem = net_info->stages[0].output_mems[0];
