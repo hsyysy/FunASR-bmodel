@@ -17,10 +17,9 @@ tar -xf tpu-mlir_v1.13.beta.0-20241203.tar.gz
 ​本例程在`scripts`目录下提供了TPU-MLIR编译FP32 BModel的脚本，请注意修改相关脚本中的onnx模型路径、生成模型目录和输入大小shapes等参数，并在执行时指定BModel运行的目标平台（**支持BM1684X/BM1688**），如：
 
 ```bash
-./scripts/gen_fp32bmodel_encoder.sh bm1684x #bm1684x/bm1688
-./scripts/gen_fp32bmodel_decoder.sh bm1684x #bm1684x/bm1688
-./scripts/gen_fp32bmodel_lstm.sh bm1684x #bm1684x/bm1688
-./scripts/gen_fp32bmodel_embedding.sh bm1684x #bm1684x/bm1688
+./scripts/gen_fp32bmodel_encoder.sh bm1684x #bm1684x/bm1688, 将encoder.onnx转为fp32精度的bmodel
+./scripts/gen_fp32bmodel_decoder.sh bm1684x #bm1684x/bm1688, 将decoder.onnx转为fp32精度的bmodel
+./scripts/gen_fp32bmodel_eb.sh bm1684x #bm1684x/bm1688, 将model_eb.onnx转为fp32精度的bmodel（仅C++流程需要）
 ```
 
 ​执行上述命令会在`models/BM1684X`等文件夹下生成转换好的FP32 BModel文件。
@@ -30,8 +29,8 @@ tar -xf tpu-mlir_v1.13.beta.0-20241203.tar.gz
 ​本例程在`scripts`目录下提供了TPU-MLIR编译FP16 BModel的脚本，请注意修改相关脚本中的onnx模型路径、生成模型目录和输入大小shapes等参数，并在执行时指定BModel运行的目标平台（**支持BM1684X/BM1688**），如：
 
 ```bash
-./scripts/gen_fp16bmodel_encoder.sh bm1688 #bm1684x/bm1688
-./scripts/gen_fp16bmodel_decoder.sh bm1688 #bm1684x/bm1688
+./scripts/gen_fp16bmodel_encoder.sh bm1684x #bm1684x/bm1688, 将encoder.onnx转为fp16精度的bmodel
+./scripts/gen_fp16bmodel_decoder.sh bm1684x #bm1684x/bm1688, 将decoder.onnx转为fp16精度的bmodel
 ```
 
 ​执行上述命令会在`models/BM1688/`等文件夹下生成转换好的FP16 BModel文件。
