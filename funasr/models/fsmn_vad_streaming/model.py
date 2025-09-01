@@ -675,10 +675,11 @@ class FsmnVADStreaming(nn.Module):
         key: list = None,
         tokenizer=None,
         frontend=None,
-        cache: dict = {},
+        cache: dict = None,
         **kwargs,
     ):
-
+        if cache is None:
+            cache = {}
         if len(cache) == 0:
             self.init_cache(cache, **kwargs)
 

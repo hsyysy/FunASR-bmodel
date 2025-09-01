@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, NamedTuple, Set, Tuple, Union
 import copy
+from functools import lru_cache
 
 import numpy as np
 import kaldi_native_fbank as knf
@@ -45,19 +46,19 @@ class WavFrontend:
         self.cmvn_file = cmvn_file
 
         if self.cmvn_file:
-            self.cmvn = self.load_cmvn()
+            self.cmvn = load_cmvn(self.cmvn_file)
         self.fbank_fn = None
         self.fbank_beg_idx = 0
         self.reset_status()
 
     def fbank(self, waveform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         waveform = waveform * (1 << 15)
-        self.fbank_fn = knf.OnlineFbank(self.opts)
-        self.fbank_fn.accept_waveform(self.opts.frame_opts.samp_freq, waveform.tolist())
-        frames = self.fbank_fn.num_frames_ready
+        fbank_fn = knf.OnlineFbank(self.opts)
+        fbank_fn.accept_waveform(self.opts.frame_opts.samp_freq, waveform.tolist())
+        frames = fbank_fn.num_frames_ready
         mat = np.empty([frames, self.opts.mel_opts.num_bins])
         for i in range(frames):
-            mat[i, :] = self.fbank_fn.get_frame(i)
+            mat[i, :] = fbank_fn.get_frame(i)
         feat = mat.astype(np.float32)
         feat_len = np.array(mat.shape[0]).astype(np.int32)
         return feat, feat_len
@@ -122,33 +123,47 @@ class WavFrontend:
         inputs = (inputs + means) * vars
         return inputs
 
-    def load_cmvn(
-        self,
-    ) -> np.ndarray:
-        with open(self.cmvn_file, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+@lru_cache()
+def load_cmvn(cmvn_file: Union[str, Path]) -> np.ndarray:
+    """load cmvn file to numpy array. 
 
-        means_list = []
-        vars_list = []
-        for i in range(len(lines)):
-            line_item = lines[i].split()
-            if line_item[0] == "<AddShift>":
-                line_item = lines[i + 1].split()
-                if line_item[0] == "<LearnRateCoef>":
-                    add_shift_line = line_item[3 : (len(line_item) - 1)]
-                    means_list = list(add_shift_line)
-                    continue
-            elif line_item[0] == "<Rescale>":
-                line_item = lines[i + 1].split()
-                if line_item[0] == "<LearnRateCoef>":
-                    rescale_line = line_item[3 : (len(line_item) - 1)]
-                    vars_list = list(rescale_line)
-                    continue
+    Args:
+        cmvn_file (Union[str, Path]): cmvn file path.
 
-        means = np.array(means_list).astype(np.float64)
-        vars = np.array(vars_list).astype(np.float64)
-        cmvn = np.array([means, vars])
-        return cmvn
+    Raises:
+        FileNotFoundError: cmvn file not exits.
+
+    Returns:
+        np.ndarray: cmvn array. shape is (2, dim).The first row is means, the second row is vars.
+    """
+
+    cmvn_file = Path(cmvn_file)
+    if not cmvn_file.exists():
+        raise FileNotFoundError("cmvn file not exits")
+    
+    with open(cmvn_file, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    means_list = []
+    vars_list = []
+    for i in range(len(lines)):
+        line_item = lines[i].split()
+        if line_item[0] == "<AddShift>":
+            line_item = lines[i + 1].split()
+            if line_item[0] == "<LearnRateCoef>":
+                add_shift_line = line_item[3 : (len(line_item) - 1)]
+                means_list = list(add_shift_line)
+                continue
+        elif line_item[0] == "<Rescale>":
+            line_item = lines[i + 1].split()
+            if line_item[0] == "<LearnRateCoef>":
+                rescale_line = line_item[3 : (len(line_item) - 1)]
+                vars_list = list(rescale_line)
+                continue
+
+    means = np.array(means_list).astype(np.float64)
+    vars = np.array(vars_list).astype(np.float64)
+    cmvn = np.array([means, vars])
+    return cmvn
 
 
 class WavFrontendOnline(WavFrontend):
