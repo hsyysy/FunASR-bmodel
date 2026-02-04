@@ -81,6 +81,7 @@ class CTTransformer(torch.nn.Module):
 
         self.punc_model = EngineOV(kwargs["model_path"]+"/punc_fp32.bmodel", device_id=kwargs['dev_id'])
         #self.punc_model = EngineOV(kwargs["model_path"]+"/punc_fp16.bmodel", device_id=kwargs['dev_id'])
+        self.punc_len = self.punc_model.model.get_input_info()['inputs']['shape'][1]
 
     def punc_forward(self, text: torch.Tensor, text_lengths: torch.Tensor, **kwargs):
         """Compute loss value from buffer sequences.
@@ -287,6 +288,9 @@ class CTTransformer(torch.nn.Module):
             mini_sentence_id = mini_sentences_id[mini_sentence_i]
             mini_sentence = cache_sent + mini_sentence
             mini_sentence_id = np.concatenate((cache_sent_id, mini_sentence_id), axis=0)
+            if len(mini_sentence_id) > self.punc_len:
+                mini_sentence_id = mini_sentence_id[-self.punc_len:]
+                mini_sentence = mini_sentence[-self.punc_len:]
             data = {
                 "text": torch.unsqueeze(torch.from_numpy(mini_sentence_id), 0),
                 "text_lengths": torch.from_numpy(np.array([len(mini_sentence_id)], dtype="int32")),
