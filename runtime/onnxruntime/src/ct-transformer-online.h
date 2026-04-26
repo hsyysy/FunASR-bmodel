@@ -23,7 +23,7 @@ private:
 	std::shared_ptr<Ort::Session> m_session;
     Ort::Env env_;
     Ort::SessionOptions session_options;
-    bool is_1688;
+    bool is_1688 = false;
 public:
 
 	CTTransformerOnline();
@@ -37,10 +37,6 @@ public:
 
 	// bmrt
 	bm_handle_t bm_handle;
-	bm_status_t status;
-	bool ret;
 	void* p_bmrt = NULL;
-	const bm_net_info_t *net_info;
-	const char **net_names;
 };
 } // namespace funasr

@@ -42,6 +42,35 @@ using namespace std;
 // bmrt
 #include "bmruntime_interface.h"
 
+namespace funasr {
+// RAII wrapper for bmrt_get_network_names result (caller-owned malloc'd array).
+struct BmrtNetNamesGuard {
+    const char** names = nullptr;
+    BmrtNetNamesGuard() = default;
+    BmrtNetNamesGuard(const BmrtNetNamesGuard&) = delete;
+    BmrtNetNamesGuard& operator=(const BmrtNetNamesGuard&) = delete;
+    ~BmrtNetNamesGuard() { if (names) free(names); }
+};
+
+// RAII tracker for device memories that must be released on the 1688 path.
+// Track each bm_device_mem_t right after a successful bm_malloc_device_byte;
+// destructor frees them in reverse order, including on exception paths.
+struct BmrtDeviceMemGuard {
+    bm_handle_t handle;
+    bool active;
+    std::vector<bm_device_mem_t> mems;
+    BmrtDeviceMemGuard(bm_handle_t h, bool a) : handle(h), active(a) {}
+    BmrtDeviceMemGuard(const BmrtDeviceMemGuard&) = delete;
+    BmrtDeviceMemGuard& operator=(const BmrtDeviceMemGuard&) = delete;
+    void track(const bm_device_mem_t& m) { if (active) mems.push_back(m); }
+    ~BmrtDeviceMemGuard() {
+        if (!active) return;
+        for (auto it = mems.rbegin(); it != mems.rend(); ++it)
+            bm_free_device(handle, *it);
+    }
+};
+} // namespace funasr
+
 #include "common-struct.h"
 #include "com-define.h"
 #include "commonfunc.h"

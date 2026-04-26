@@ -52,11 +52,7 @@ public:
 
     // bmrt
     bm_handle_t bm_handle;
-    bm_status_t status;
-    bool ret;
     void* p_bmrt = NULL;
-    const bm_net_info_t *net_info;
-    const char **net_names;
 
 private:
 
@@ -69,7 +65,7 @@ private:
     void LfrCmvn(std::vector<std::vector<float>> &vad_feats);
     void LoadCmvn(const char *filename);
     void InitCache();
-    bool is_1688;
+    bool is_1688 = false;
 
 };
 

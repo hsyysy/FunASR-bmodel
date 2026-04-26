@@ -59,18 +59,13 @@ void FsmnVad::ReadModel(const char* vad_model, int dev_id) {
     try {
         //vad_session_ = std::make_shared<Ort::Session>(
                 //env_, ORTCHAR(vad_model), session_options_);
-        status = bm_dev_request(&bm_handle, dev_id);
+        bm_status_t status = bm_dev_request(&bm_handle, dev_id);
         assert(BM_SUCCESS == status);
 
         p_bmrt = bmrt_create(bm_handle);
         assert(NULL != p_bmrt);
-        ret = bmrt_load_bmodel(p_bmrt, vad_model);
+        bool ret = bmrt_load_bmodel(p_bmrt, vad_model);
         assert(true == ret);
-
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt, net_names[0]);
-        assert(NULL != net_info);
         LOG(INFO) << "Successfully load model from " << vad_model;
     } catch (std::exception const &e) {
         LOG(ERROR) << "Error when load vad bmodel: " << e.what();
@@ -115,12 +110,23 @@ void FsmnVad::Forward(
     */
 
     // input tensor of vad
-    bm_tensor_t input_tensors_vad[net_info->input_num];
+    BmrtNetNamesGuard names_guard;
+    bmrt_get_network_names(p_bmrt, &names_guard.names);
+    const char** net_names = names_guard.names;
+    const bm_net_info_t* net_info = bmrt_get_network_info(p_bmrt, net_names[0]);
+    assert(NULL != net_info);
+
+    BmrtDeviceMemGuard mem_guard(bm_handle, is_1688);
+    bm_status_t status;
+    bool ret;
+    std::vector<bm_tensor_t> input_tensors_vad(net_info->input_num);
     input_tensors_vad[0].shape = {3, {1, num_frames, feature_dim}};
     input_tensors_vad[0].dtype = net_info->input_dtypes[0];
     if (is_1688){
         size_t size = bmrt_tensor_bytesize(&input_tensors_vad[0]);
-        bm_malloc_device_byte(bm_handle, &input_tensors_vad[0].device_mem, size);
+        status = bm_malloc_device_byte(bm_handle, &input_tensors_vad[0].device_mem, size);
+        assert(BM_SUCCESS == status);
+        mem_guard.track(input_tensors_vad[0].device_mem);
     }else
         input_tensors_vad[0].device_mem = net_info->stages[0].input_mems[0];
     input_tensors_vad[0].st_mode = BM_STORE_1N;
@@ -133,18 +139,21 @@ void FsmnVad::Forward(
         input_tensors_vad[i].dtype = net_info->input_dtypes[i];
         if (is_1688){
             size_t size = bmrt_tensor_bytesize(&input_tensors_vad[i]);
-            bm_malloc_device_byte(bm_handle, &input_tensors_vad[i].device_mem, size);
+            status = bm_malloc_device_byte(bm_handle, &input_tensors_vad[i].device_mem, size);
+            assert(BM_SUCCESS == status);
+            mem_guard.track(input_tensors_vad[i].device_mem);
         } else
             input_tensors_vad[i].device_mem = net_info->stages[0].input_mems[i];
         input_tensors_vad[i].st_mode = BM_STORE_1N;
         bm_memcpy_s2d_partial(bm_handle, input_tensors_vad[i].device_mem, (*in_cache)[i-1].data(), (*in_cache)[i-1].size()*sizeof(float));
     }
     // output tensor of vad
-    bm_tensor_t output_tensors_vad[net_info->output_num];
+    std::vector<bm_tensor_t> output_tensors_vad(net_info->output_num);
     for (int i=0;i<net_info->output_num;i++) {
         if (is_1688){
             status = bm_malloc_device_byte(bm_handle, &output_tensors_vad[i].device_mem, net_info->max_output_bytes[i]);
             assert(BM_SUCCESS == status);
+            mem_guard.track(output_tensors_vad[i].device_mem);
         } else
             output_tensors_vad[i].device_mem = net_info->stages[0].output_mems[i];
     }
@@ -153,7 +162,7 @@ void FsmnVad::Forward(
     //std::vector<Ort::Value> vad_ort_outputs;
     try {
         // forward
-        ret = bmrt_launch_tensor_ex(p_bmrt, net_names[0], input_tensors_vad, 5, output_tensors_vad, 5, true, false);
+        ret = bmrt_launch_tensor_ex(p_bmrt, net_names[0], input_tensors_vad.data(), 5, output_tensors_vad.data(), 5, true, false);
         assert(true == ret);
         bm_thread_sync(bm_handle);
         /*
@@ -199,14 +208,6 @@ void FsmnVad::Forward(
         status = bm_memcpy_d2s_partial(bm_handle, data.data(), output_tensors_vad[i].device_mem, cache_out_size);
         assert(BM_SUCCESS == status);
         memcpy((*in_cache)[i-1].data(), data.data(), sizeof(float) * 128*19);
-        }
-    }
-    if (is_1688){
-        for (int i = 0; i < net_info->output_num; ++i) {
-            bm_free_device(bm_handle, input_tensors_vad[i].device_mem);
-        }
-        for (int i = 0; i < net_info->output_num; ++i) {
-            bm_free_device(bm_handle, output_tensors_vad[i].device_mem);
         }
     }
 }
@@ -348,7 +349,6 @@ void FsmnVad::Test() {
 }
 
 FsmnVad::~FsmnVad() {
-    free(net_names);
     if(p_bmrt!=NULL){
         bmrt_destroy(p_bmrt);
     }

@@ -15,7 +15,7 @@ Paraformer::Paraformer()
 :use_hotword(false),
  env_(ORT_LOGGING_LEVEL_ERROR, "paraformer"),session_options_{},
  hw_env_(ORT_LOGGING_LEVEL_ERROR, "paraformer_hw"),hw_session_options{} {
-    status = bm_dev_request(&bm_handle, DEV_ID);
+    bm_status_t status = bm_dev_request(&bm_handle, DEV_ID);
     assert(BM_SUCCESS == status);
 
     unsigned p_chipid;
@@ -26,6 +26,7 @@ Paraformer::Paraformer()
 
 // bmrt
 void Paraformer::InitBmrt(const char* en_model, const char* de_model){
+    bool ret;
     try {
         p_bmrt_offline_encoder = bmrt_create(bm_handle);
         assert(NULL != p_bmrt_offline_encoder);
@@ -116,6 +117,7 @@ void Paraformer::InitAsr(const std::string &en_model, const std::string &de_mode
     std::string encoder_model = PathAppend(model_dir, ENCODER_ONLINE_MODEL_NAME);
     std::string decoder_model = PathAppend(model_dir, DECODER_ONLINE_MODEL_NAME);
 
+    bool ret;
     try {
         //encoder_session_ = std::make_unique<Ort::Session>(env_, ORTSTRING(en_model).c_str(), session_options_);
         p_bmrt_online_encoder = bmrt_create(bm_handle);
@@ -303,11 +305,9 @@ void Paraformer::InitHwCompiler(const std::string &hw_model, int thread_num) {
 
     try {
         //hw_m_session = std::make_unique<Ort::Session>(hw_env_, ORTSTRING(hw_model).c_str(), hw_session_options);
-        status = bm_dev_request(&bm_handle, DEV_ID);
-        assert(BM_SUCCESS == status);
         p_bmrt_hw = bmrt_create(bm_handle);
         assert(NULL != p_bmrt_hw);
-        ret = bmrt_load_bmodel(p_bmrt_hw, hw_model.c_str());
+        bool ret = bmrt_load_bmodel(p_bmrt_hw, hw_model.c_str());
         assert(true == ret);
         LOG(INFO) << "Successfully load model from " << hw_model;
     } catch (std::exception const &e) {
@@ -594,22 +594,30 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
     */
 
     try {
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt_offline_encoder, net_names[0]);
-        assert(NULL != net_info);
+        BmrtNetNamesGuard enc_names_guard;
+        bmrt_get_network_names(p_bmrt_offline_encoder, &enc_names_guard.names);
+        const char** enc_net_names = enc_names_guard.names;
+        const bm_net_info_t* enc_net_info = bmrt_get_network_info(p_bmrt_offline_encoder, enc_net_names[0]);
+        assert(NULL != enc_net_info);
+
+        BmrtDeviceMemGuard mem_guard(bm_handle, is_1688);
+        bm_status_t status;
+        bool ret;
+        std::vector<float> output_data;
 
         // input tensor of encoder
-        bm_tensor_t input_tensors_encoder[net_info->input_num];
+        std::vector<bm_tensor_t> input_tensors_encoder(enc_net_info->input_num);
         input_tensors_encoder[0].shape = {3, {1, num_frames, feat_dim}};
         input_tensors_encoder[1].shape = {1, {1}};
-        for (int i=0;i<net_info->input_num;i++){
-            input_tensors_encoder[i].dtype = net_info->input_dtypes[i];
+        for (int i=0;i<enc_net_info->input_num;i++){
+            input_tensors_encoder[i].dtype = enc_net_info->input_dtypes[i];
             if (is_1688) {
                 size_t size = bmrt_tensor_bytesize(&input_tensors_encoder[i]);
-                bm_malloc_device_byte(bm_handle, &input_tensors_encoder[i].device_mem, size);
+                status = bm_malloc_device_byte(bm_handle, &input_tensors_encoder[i].device_mem, size);
+                assert(BM_SUCCESS == status);
+                mem_guard.track(input_tensors_encoder[i].device_mem);
             } else
-                input_tensors_encoder[i].device_mem = net_info->stages[0].input_mems[i];
+                input_tensors_encoder[i].device_mem = enc_net_info->stages[0].input_mems[i];
             input_tensors_encoder[i].st_mode = BM_STORE_1N;
         }
 
@@ -620,22 +628,24 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         assert(BM_SUCCESS == status);
 
         // output tensor of encoder
-        bm_tensor_t output_tensors_encoder[net_info->output_num];
+        std::vector<bm_tensor_t> output_tensors_encoder(enc_net_info->output_num);
         output_tensors_encoder[0].shape = {3, {1,num_frames,512}};
         output_tensors_encoder[1].shape = {3, {1,num_frames+1,512}};
         output_tensors_encoder[2].shape = {2, {1,num_frames+1}};
         output_tensors_encoder[3].shape = {1, {1}};
-        for (int i=0;i<net_info->output_num;i++){
-            output_tensors_encoder[i].dtype = net_info->output_dtypes[i];
+        for (int i=0;i<enc_net_info->output_num;i++){
+            output_tensors_encoder[i].dtype = enc_net_info->output_dtypes[i];
             if (is_1688) {
                 size_t size = bmrt_tensor_bytesize(&output_tensors_encoder[i]);
-                bm_malloc_device_byte(bm_handle, &output_tensors_encoder[i].device_mem, size);
+                status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[i].device_mem, size);
+                assert(BM_SUCCESS == status);
+                mem_guard.track(output_tensors_encoder[i].device_mem);
             }else
-                output_tensors_encoder[i].device_mem = net_info->stages[0].output_mems[i];
+                output_tensors_encoder[i].device_mem = enc_net_info->stages[0].output_mems[i];
         }
 
         // forward
-        ret = bmrt_launch_tensor_ex(p_bmrt_offline_encoder, net_names[0], input_tensors_encoder, 2, output_tensors_encoder, 4, true, false);
+        ret = bmrt_launch_tensor_ex(p_bmrt_offline_encoder, enc_net_names[0], input_tensors_encoder.data(), 2, output_tensors_encoder.data(), 4, true, false);
         assert(true == ret);
         bm_thread_sync(bm_handle);
 
@@ -703,26 +713,28 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         }
 
         // decoder
-        free(net_names);
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
-        assert(NULL != net_info);
+        BmrtNetNamesGuard dec_names_guard;
+        bmrt_get_network_names(p_bmrt_offline_decoder, &dec_names_guard.names);
+        const char** dec_net_names = dec_names_guard.names;
+        const bm_net_info_t* dec_net_info = bmrt_get_network_info(p_bmrt_offline_decoder, dec_net_names[0]);
+        assert(NULL != dec_net_info);
 
-        bm_tensor_t input_tensors_decoder[net_info->input_num];
+        std::vector<bm_tensor_t> input_tensors_decoder(dec_net_info->input_num);
         input_tensors_decoder[0].shape = {3, {batch_size, num_frames, 512}};
         input_tensors_decoder[1].shape = {1, {batch_size}};
         input_tensors_decoder[2].shape = {3, {batch_size, token_num_int, feature_size}};
         input_tensors_decoder[3].shape = {1, {batch_size}};
         input_tensors_decoder[4].shape = {3, {batch_size, hw_emb_count, 512}};
-        for(int i=0;i<net_info->input_num;i++){
-            input_tensors_decoder[i].dtype = net_info->input_dtypes[i];
+        for(int i=0;i<dec_net_info->input_num;i++){
+            input_tensors_decoder[i].dtype = dec_net_info->input_dtypes[i];
             if (i>1) {
                 if (is_1688) {
                     size_t size = bmrt_tensor_bytesize(&input_tensors_decoder[i]);
-                    bm_malloc_device_byte(bm_handle, &input_tensors_decoder[i].device_mem, size);
+                    status = bm_malloc_device_byte(bm_handle, &input_tensors_decoder[i].device_mem, size);
+                    assert(BM_SUCCESS == status);
+                    mem_guard.track(input_tensors_decoder[i].device_mem);
                 } else {
-                    input_tensors_decoder[i].device_mem = net_info->stages[0].input_mems[i];
+                    input_tensors_decoder[i].device_mem = dec_net_info->stages[0].input_mems[i];
                 }
             }
             input_tensors_decoder[i].st_mode = BM_STORE_1N;
@@ -739,14 +751,15 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_decoder[4].device_mem, hw_embed.data(), batch_size*hw_emb_count*512*sizeof(float));
         assert(BM_SUCCESS == status);
 
-        bm_tensor_t output_tensors_decoder[1];
+        std::vector<bm_tensor_t> output_tensors_decoder(1);
         if (is_1688){
-            status = bm_malloc_device_byte(bm_handle, &output_tensors_decoder[0].device_mem, net_info->max_output_bytes[0]);
+            status = bm_malloc_device_byte(bm_handle, &output_tensors_decoder[0].device_mem, dec_net_info->max_output_bytes[0]);
             assert(BM_SUCCESS == status);
+            mem_guard.track(output_tensors_decoder[0].device_mem);
         } else
-            output_tensors_decoder[0].device_mem = net_info->stages[0].output_mems[0];
+            output_tensors_decoder[0].device_mem = dec_net_info->stages[0].output_mems[0];
 
-        ret = bmrt_launch_tensor_ex(p_bmrt_offline_decoder, net_names[0], input_tensors_decoder, 5, output_tensors_decoder, 1, true, false);
+        ret = bmrt_launch_tensor_ex(p_bmrt_offline_decoder, dec_net_names[0], input_tensors_decoder.data(), 5, output_tensors_decoder.data(), 1, true, false);
         assert(true == ret);
         bm_thread_sync(bm_handle);
 
@@ -756,35 +769,6 @@ std::vector<std::string> Paraformer::Forward(float** din, int* len, bool input_f
         assert(BM_SUCCESS == status);
         auto decoder_out_lens = decoder_out_shape.dims[1];
         auto decoder_out_vocab = decoder_out_shape.dims[2];
-
-        // free device memory
-        if (is_1688){
-            // free encoder
-            free(net_names);
-            net_names = NULL;
-            bmrt_get_network_names(p_bmrt_offline_encoder, &net_names);
-            net_info = bmrt_get_network_info(p_bmrt_offline_encoder, net_names[0]);
-            assert(NULL != net_info);
-            for (int i = 0; i < net_info->input_num; ++i) {
-                bm_free_device(bm_handle, input_tensors_encoder[i].device_mem);
-            }
-            for (int i = 0; i < net_info->output_num; ++i) {
-                bm_free_device(bm_handle, output_tensors_encoder[i].device_mem);
-            }
-            // free decoder
-            free(net_names);
-            net_names = NULL;
-            bmrt_get_network_names(p_bmrt_offline_decoder, &net_names);
-            net_info = bmrt_get_network_info(p_bmrt_offline_decoder, net_names[0]);
-            assert(NULL != net_info);
-            for (int i = 2; i < net_info->input_num; ++i) {
-                bm_free_device(bm_handle, input_tensors_decoder[i].device_mem);
-            }
-            for (int i = 0; i < net_info->output_num; ++i) {
-                bm_free_device(bm_handle, output_tensors_decoder[i].device_mem);
-            }
-        }
-        free(net_names);
 
         result = BeamSearch(wfst_decoder, output_data.data(), decoder_out_lens, decoder_out_vocab);
         if (input_finished) {
@@ -926,30 +910,38 @@ std::vector<std::vector<float>> Paraformer::CompileHotwordEmbedding(std::string 
     std::vector<std::vector<float>> result;
     try {
         //bmrt
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_hw, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt_hw, net_names[0]);
-        assert(NULL != net_info);
-        bm_tensor_t input_tensors_hw[1];
+        BmrtNetNamesGuard hw_names_guard;
+        bmrt_get_network_names(p_bmrt_hw, &hw_names_guard.names);
+        const char** hw_net_names = hw_names_guard.names;
+        const bm_net_info_t* hw_net_info = bmrt_get_network_info(p_bmrt_hw, hw_net_names[0]);
+        assert(NULL != hw_net_info);
+        BmrtDeviceMemGuard mem_guard(bm_handle, is_1688);
+        bm_status_t status;
+        bool ret;
+        std::vector<bm_tensor_t> input_tensors_hw(1);
         input_tensors_hw[0].shape = {2, {hotword_size, max_hotword_len}};
-        input_tensors_hw[0].dtype = net_info->input_dtypes[0];
+        input_tensors_hw[0].dtype = hw_net_info->input_dtypes[0];
         if (is_1688) {
             size_t size = bmrt_tensor_bytesize(&input_tensors_hw[0]);
-            bm_malloc_device_byte(bm_handle, &input_tensors_hw[0].device_mem, size);
+            status = bm_malloc_device_byte(bm_handle, &input_tensors_hw[0].device_mem, size);
+            assert(BM_SUCCESS == status);
+            mem_guard.track(input_tensors_hw[0].device_mem);
         } else
-            input_tensors_hw[0].device_mem = net_info->stages[0].input_mems[0];
+            input_tensors_hw[0].device_mem = hw_net_info->stages[0].input_mems[0];
         input_tensors_hw[0].st_mode = BM_STORE_1N;
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_hw[0].device_mem, (int32_t*)hotword_matrix.data(), hotword_size*max_hotword_len*sizeof(int32_t));
         assert(BM_SUCCESS == status);
 
-        bm_tensor_t output_tensors_hw[1];
+        std::vector<bm_tensor_t> output_tensors_hw(1);
         if (is_1688) {
-            bm_malloc_device_byte(bm_handle, &output_tensors_hw[0].device_mem, net_info->max_output_bytes[0]);
+            status = bm_malloc_device_byte(bm_handle, &output_tensors_hw[0].device_mem, hw_net_info->max_output_bytes[0]);
+            assert(BM_SUCCESS == status);
+            mem_guard.track(output_tensors_hw[0].device_mem);
         } else
-            output_tensors_hw[0].device_mem = net_info->stages[0].output_mems[0];
+            output_tensors_hw[0].device_mem = hw_net_info->stages[0].output_mems[0];
 
         //forward
-        ret = bmrt_launch_tensor_ex(p_bmrt_hw, net_names[0], input_tensors_hw, 1, output_tensors_hw, 1, true, false);
+        ret = bmrt_launch_tensor_ex(p_bmrt_hw, hw_net_names[0], input_tensors_hw.data(), 1, output_tensors_hw.data(), 1, true, false);
         assert(true == ret);
         bm_thread_sync(bm_handle);
         /*
@@ -978,14 +970,6 @@ std::vector<std::vector<float>> Paraformer::CompileHotwordEmbedding(std::string 
             std::vector<float> embedding;
             embedding.insert(embedding.begin(), floatData.begin() + start_pos, floatData.begin() + start_pos + embedding_dim);
             result.push_back(embedding);
-        }
-        if (is_1688){
-            for (int i = 0; i < net_info->input_num; ++i) {
-                bm_free_device(bm_handle, input_tensors_hw[i].device_mem);
-            }
-            for (int i = 0; i < net_info->output_num; ++i) {
-                bm_free_device(bm_handle, output_tensors_hw[i].device_mem);
-            }
         }
     }
     catch (std::exception const &e)

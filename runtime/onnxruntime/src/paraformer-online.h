@@ -86,7 +86,7 @@ namespace funasr {
         int fsmn_dims = 512;
         float cif_threshold = 1.0;
         float tail_alphas = 0.45;
-        bool is_1688;
+        bool is_1688 = false;
 
         // configs
         int feat_dims = lfr_m*n_mels;
@@ -116,10 +116,6 @@ namespace funasr {
 
         // bmrt
         bm_handle_t bm_handle;
-        bm_status_t status;
-        bool ret;
-        const bm_net_info_t *net_info;
-        const char **net_names;
         bm_device_mem_t cache_mem[16];
 
         void* p_bmrt_online_encoder;

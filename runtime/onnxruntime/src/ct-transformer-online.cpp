@@ -18,20 +18,15 @@ void CTTransformerOnline::InitPunc(const std::string &punc_model, const std::str
     session_options.DisableCpuMemArena();
     */
 
-    try{
+    try {
         //m_session = std::make_unique<Ort::Session>(env_, ORTSTRING(punc_model).c_str(), session_options);
-        status = bm_dev_request(&bm_handle, DEV_ID);
+        bm_status_t status = bm_dev_request(&bm_handle, DEV_ID);
         assert(BM_SUCCESS == status);
 
         p_bmrt = bmrt_create(bm_handle);
         assert(NULL != p_bmrt);
-        ret = bmrt_load_bmodel(p_bmrt, punc_model.c_str());
+        bool ret = bmrt_load_bmodel(p_bmrt, punc_model.c_str());
         assert(true == ret);
-
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt, net_names[0]);
-        assert(NULL != net_info);
         LOG(INFO) << "Successfully load model from " << punc_model;
 
         unsigned p_chipid;
@@ -55,7 +50,6 @@ void CTTransformerOnline::InitPunc(const std::string &punc_model, const std::str
 
 CTTransformerOnline::~CTTransformerOnline()
 {
-    free(net_names);
     if(p_bmrt!=NULL){
         bmrt_destroy(p_bmrt);
     }
@@ -231,14 +225,25 @@ vector<int> CTTransformerOnline::Infer(vector<int32_t> input_data, int nCacheSiz
     input_onnx.emplace_back(std::move(onnx_sub_mask));
     */
     // input tensor of punc
-    bm_tensor_t input_tensors_punc[net_info->input_num];
+    BmrtNetNamesGuard names_guard;
+    bmrt_get_network_names(p_bmrt, &names_guard.names);
+    const char** net_names = names_guard.names;
+    const bm_net_info_t* net_info = bmrt_get_network_info(p_bmrt, net_names[0]);
+    assert(NULL != net_info);
+
+    BmrtDeviceMemGuard mem_guard(bm_handle, is_1688);
+    bm_status_t status;
+    bool ret;
+    std::vector<bm_tensor_t> input_tensors_punc(net_info->input_num);
     input_tensors_punc[0].shape = {2, {1, (int)input_data.size()}};
     input_tensors_punc[1].shape = {1, {1}};
     for(int i=0;i<net_info->input_num;i++){
         input_tensors_punc[i].dtype = net_info->input_dtypes[i];
         if (is_1688){
             size_t size = bmrt_tensor_bytesize(&input_tensors_punc[i]);
-            bm_malloc_device_byte(bm_handle, &input_tensors_punc[i].device_mem, size);
+            status = bm_malloc_device_byte(bm_handle, &input_tensors_punc[i].device_mem, size);
+            assert(BM_SUCCESS == status);
+            mem_guard.track(input_tensors_punc[i].device_mem);
         } else
             input_tensors_punc[i].device_mem = net_info->stages[0].input_mems[i];
         input_tensors_punc[i].st_mode = BM_STORE_1N;
@@ -251,16 +256,17 @@ vector<int> CTTransformerOnline::Infer(vector<int32_t> input_data, int nCacheSiz
     assert(BM_SUCCESS == status);
 
     // output tensor of punc
-    bm_tensor_t output_tensors_punc[net_info->output_num];
+    std::vector<bm_tensor_t> output_tensors_punc(net_info->output_num);
     if (is_1688){
         status = bm_malloc_device_byte(bm_handle, &output_tensors_punc[0].device_mem, net_info->max_output_bytes[0]);
         assert(BM_SUCCESS == status);
+        mem_guard.track(output_tensors_punc[0].device_mem);
     } else
         output_tensors_punc[0].device_mem = net_info->stages[0].output_mems[0];
-        
+
     try {
         // forward
-        ret = bmrt_launch_tensor_ex(p_bmrt, net_names[0], input_tensors_punc, 2, output_tensors_punc, 1, true, false);
+        ret = bmrt_launch_tensor_ex(p_bmrt, net_names[0], input_tensors_punc.data(), 2, output_tensors_punc.data(), 1, true, false);
         assert(true == ret);
         bm_thread_sync(bm_handle);
         /*
@@ -281,15 +287,6 @@ vector<int> CTTransformerOnline::Infer(vector<int32_t> input_data, int nCacheSiz
         {
             int index = Argmax(floatData.begin() + i, floatData.begin() + i + CANDIDATE_NUM-1);
             punction.push_back(index);
-        }
-        // free memory
-        if (is_1688) {
-            for (int i = 0; i < net_info->output_num; ++i) {
-                bm_free_device(bm_handle, input_tensors_punc[i].device_mem);
-            }
-            for (int i = 0; i < net_info->output_num; ++i) {
-                bm_free_device(bm_handle, output_tensors_punc[i].device_mem);
-            }
         }
     }
     catch (std::exception const &e)

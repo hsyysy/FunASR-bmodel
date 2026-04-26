@@ -105,16 +105,18 @@ void ParaformerOnline::InitOnline(
     is_1688 = is_1688_;
     if (is_1688){
         for (int i=0;i<16;i++){
-            bm_malloc_device_byte(bm_handle, &cache_mem[i], 5120*sizeof(float));
+            bm_status_t status = bm_malloc_device_byte(bm_handle, &cache_mem[i], 5120*sizeof(float));
+            assert(BM_SUCCESS == status);
         }
     } else {
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_online_decoder, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt_online_decoder, net_names[0]);
-        assert(NULL != net_info);
+        const char** local_net_names = nullptr;
+        bmrt_get_network_names(p_bmrt_online_decoder, &local_net_names);
+        const bm_net_info_t* local_net_info = bmrt_get_network_info(p_bmrt_online_decoder, local_net_names[0]);
+        assert(NULL != local_net_info);
         for (int i=0;i<16;i++){
-            cache_mem[i] = net_info->stages[0].input_mems[i+4];
+            cache_mem[i] = local_net_info->stages[0].input_mems[i+4];
         }
+        free(local_net_names);
     }
 
     frame_length = frame_length_;
@@ -481,21 +483,28 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
         */
 
         // bmrt
-        net_names = NULL;
-        bmrt_get_network_names(p_bmrt_online_encoder, &net_names);
-        net_info = bmrt_get_network_info(p_bmrt_online_encoder, net_names[0]);
-        assert(NULL != net_info);
+        BmrtNetNamesGuard enc_names_guard;
+        bmrt_get_network_names(p_bmrt_online_encoder, &enc_names_guard.names);
+        const char** enc_net_names = enc_names_guard.names;
+        const bm_net_info_t* enc_net_info = bmrt_get_network_info(p_bmrt_online_encoder, enc_net_names[0]);
+        assert(NULL != enc_net_info);
+
+        BmrtDeviceMemGuard mem_guard(bm_handle, is_1688);
+        bm_status_t status;
+        bool ret;
         // input tensor of encoder
-        bm_tensor_t input_tensors_encoder[net_info->input_num];
+        std::vector<bm_tensor_t> input_tensors_encoder(enc_net_info->input_num);
         input_tensors_encoder[0].shape = {3, {1, num_frames, feat_dims}};
         input_tensors_encoder[1].shape = {1, {1}};
-        for (int i=0;i<net_info->input_num;i++){
-            input_tensors_encoder[i].dtype = net_info->input_dtypes[i];
+        for (int i=0;i<enc_net_info->input_num;i++){
+            input_tensors_encoder[i].dtype = enc_net_info->input_dtypes[i];
             if (is_1688) {
                 size_t size = bmrt_tensor_bytesize(&input_tensors_encoder[i]);
-                bm_malloc_device_byte(bm_handle, &input_tensors_encoder[i].device_mem, size);
+                status = bm_malloc_device_byte(bm_handle, &input_tensors_encoder[i].device_mem, size);
+                assert(BM_SUCCESS == status);
+                mem_guard.track(input_tensors_encoder[i].device_mem);
             } else
-                input_tensors_encoder[i].device_mem = net_info->stages[0].input_mems[i];
+                input_tensors_encoder[i].device_mem = enc_net_info->stages[0].input_mems[i];
             input_tensors_encoder[i].st_mode = BM_STORE_1N;
         }
         status = bm_memcpy_s2d_partial(bm_handle, input_tensors_encoder[0].device_mem, wav_feats.data(), wav_feats.size()*sizeof(float));
@@ -505,17 +514,18 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
         assert(BM_SUCCESS == status);
 
         // output tensor of encoder
-        bm_tensor_t output_tensors_encoder[net_info->output_num];
-        for (int i=0;i<net_info->output_num;i++) {
+        std::vector<bm_tensor_t> output_tensors_encoder(enc_net_info->output_num);
+        for (int i=0;i<enc_net_info->output_num;i++) {
             if (is_1688){
-                status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[i].device_mem, net_info->max_output_bytes[i]);
+                status = bm_malloc_device_byte(bm_handle, &output_tensors_encoder[i].device_mem, enc_net_info->max_output_bytes[i]);
                 assert(BM_SUCCESS == status);
+                mem_guard.track(output_tensors_encoder[i].device_mem);
             } else
-                output_tensors_encoder[i].device_mem = net_info->stages[0].output_mems[i];
+                output_tensors_encoder[i].device_mem = enc_net_info->stages[0].output_mems[i];
         }
 
         // forward
-        ret = bmrt_launch_tensor_ex(p_bmrt_online_encoder, net_names[0], input_tensors_encoder, net_info->input_num, output_tensors_encoder, net_info->output_num, true, false);
+        ret = bmrt_launch_tensor_ex(p_bmrt_online_encoder, enc_net_names[0], input_tensors_encoder.data(), enc_net_info->input_num, output_tensors_encoder.data(), enc_net_info->output_num, true, false);
         assert(true == ret);
         bm_thread_sync(bm_handle);
         
@@ -601,39 +611,42 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             */
 
             //bmrt
-            free(net_names);
-            net_names = NULL;
-            bmrt_get_network_names(p_bmrt_online_decoder, &net_names);
-            net_info = bmrt_get_network_info(p_bmrt_online_decoder, net_names[0]);
-            assert(NULL != net_info);
+            BmrtNetNamesGuard dec_names_guard;
+            bmrt_get_network_names(p_bmrt_online_decoder, &dec_names_guard.names);
+            const char** dec_net_names = dec_names_guard.names;
+            const bm_net_info_t* dec_net_info = bmrt_get_network_info(p_bmrt_online_decoder, dec_net_names[0]);
+            assert(NULL != dec_net_info);
             // input and output tensor of decoder
-            bm_tensor_t input_tensors_decoder[net_info->input_num];
+            std::vector<bm_tensor_t> input_tensors_decoder(dec_net_info->input_num);
             input_tensors_decoder[0].shape = output_tensors_encoder[0].shape;
             input_tensors_decoder[1].shape = {1, {1}};
             input_tensors_decoder[2].shape = {3, {1, static_cast<int>(list_frame.size()), static_cast<int>(list_frame[0].size())}};
             input_tensors_decoder[3].shape = {1, {1}};
             for(int i=0;i<16;i++)
                 input_tensors_decoder[i+4].shape = {3, {1,512,10}};
-            for(int i=0;i<net_info->input_num;i++){
-                input_tensors_decoder[i].dtype = net_info->input_dtypes[i];
+            for(int i=0;i<dec_net_info->input_num;i++){
+                input_tensors_decoder[i].dtype = dec_net_info->input_dtypes[i];
                 input_tensors_decoder[i].st_mode = BM_STORE_1N;
             }
             input_tensors_decoder[0].device_mem = output_tensors_encoder[0].device_mem;
             for(int i=1;i<4;i++){
                 if (is_1688){
                     size_t size = bmrt_tensor_bytesize(&input_tensors_decoder[i]);
-                    bm_malloc_device_byte(bm_handle, &input_tensors_decoder[i].device_mem, size);
+                    status = bm_malloc_device_byte(bm_handle, &input_tensors_decoder[i].device_mem, size);
+                    assert(BM_SUCCESS == status);
+                    mem_guard.track(input_tensors_decoder[i].device_mem);
                 } else
-                    input_tensors_decoder[i].device_mem = net_info->stages[0].input_mems[i];
+                    input_tensors_decoder[i].device_mem = dec_net_info->stages[0].input_mems[i];
             }
 
-            bm_tensor_t output_tensors_decoder[net_info->output_num];
+            std::vector<bm_tensor_t> output_tensors_decoder(dec_net_info->output_num);
             for (int i=0;i<2;i++) {
                 if (is_1688){
-                    status = bm_malloc_device_byte(bm_handle, &output_tensors_decoder[i].device_mem, net_info->max_output_bytes[i]);
+                    status = bm_malloc_device_byte(bm_handle, &output_tensors_decoder[i].device_mem, dec_net_info->max_output_bytes[i]);
                     assert(BM_SUCCESS == status);
+                    mem_guard.track(output_tensors_decoder[i].device_mem);
                 } else
-                    output_tensors_decoder[i].device_mem = net_info->stages[0].output_mems[i];
+                    output_tensors_decoder[i].device_mem = dec_net_info->stages[0].output_mems[i];
             }
 
             for(int i=0;i<16;i++){
@@ -651,7 +664,7 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             assert(BM_SUCCESS == status);
 
             // forward
-            ret = bmrt_launch_tensor_ex(p_bmrt_online_decoder, net_names[0], input_tensors_decoder, net_info->input_num, output_tensors_decoder, net_info->output_num, true, false);
+            ret = bmrt_launch_tensor_ex(p_bmrt_online_decoder, dec_net_names[0], input_tensors_decoder.data(), dec_net_info->input_num, output_tensors_decoder.data(), dec_net_info->output_num, true, false);
             assert(true == ret);
             bm_thread_sync(bm_handle);
 
@@ -683,28 +696,6 @@ string ParaformerOnline::ForwardChunk(std::vector<std::vector<float>> &chunk_fea
             result = offline_handle_->GreedySearch(float_data, list_frame.size(), decoder_shape[2]);
             */
             result = offline_handle_->GreedySearch(float_data.data(), list_frame.size(), decoder_out_shape.dims[2]);
-
-            if (is_1688){
-                for (int i = 1; i < 4; ++i) {
-                    bm_free_device(bm_handle, input_tensors_decoder[i].device_mem);
-                }
-                for (int i = 0; i < 2; ++i) {
-                    bm_free_device(bm_handle, output_tensors_decoder[i].device_mem);
-                }
-            }
-            free(net_names);
-            net_names = NULL;
-            bmrt_get_network_names(p_bmrt_online_encoder, &net_names);
-            net_info = bmrt_get_network_info(p_bmrt_online_encoder, net_names[0]);
-            assert(NULL != net_info);
-            if (is_1688){
-                for (int i = 0; i < net_info->input_num; ++i) {
-                    bm_free_device(bm_handle, input_tensors_encoder[i].device_mem);
-                }
-                for (int i = 0; i < net_info->output_num; ++i) {
-                    bm_free_device(bm_handle, output_tensors_encoder[i].device_mem);
-                }
-            }
         }
     }catch (std::exception const &e)
     {
@@ -790,7 +781,6 @@ string ParaformerOnline::Forward(float* din, int len, bool input_finished, const
 
 ParaformerOnline::~ParaformerOnline()
 {
-    free(net_names);
     if (is_1688){
         for (int i=0;i<16;i++){
             bm_free_device(bm_handle, cache_mem[i]);

@@ -91,8 +91,6 @@ namespace funasr {
 
         // bmrt
         bm_handle_t bm_handle;
-        bm_status_t status;
-        bool ret;
         bool is_1688 = false;
 
         void* p_bmrt_online_encoder = NULL;
@@ -100,9 +98,6 @@ namespace funasr {
         void* p_bmrt_offline_encoder = NULL;
         void* p_bmrt_offline_decoder = NULL;
         void* p_bmrt_hw = NULL;
-        const bm_net_info_t *net_info;
-        const char **net_names;
-        std::vector<float> output_data;
 
         // paraformer-online
         std::shared_ptr<Ort::Session> encoder_session_ = nullptr;
