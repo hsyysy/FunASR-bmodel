@@ -352,7 +352,7 @@ class FsmnVADStreaming(nn.Module):
 
 
     def ComputeScores(self, feats: torch.Tensor, cache: dict = {}) -> None:
-        #scores = self.encoder(feats, cache=cache["encoder"]).to("cpu")  # return B * T * D
+#scores = self.encoder(feats, cache=cache["encoder"]).to("cpu")  # return B * T * D
         cache_frames = self.encoder_conf.get("lorder") + self.encoder_conf.get("rorder") - 1
         speech = feats.detach().numpy()
         if cache["encoder"].get("cache_layer_0") is None:
@@ -747,7 +747,7 @@ class FsmnVADStreaming(nn.Module):
             if len(segments_i) > 0:
                 segments.extend(*segments_i)
 
-        cache["prev_samples"] = audio_sample[:-m]
+        cache["prev_samples"] = audio_sample[-m:] if m > 0 else torch.empty(0)
         if _is_final:
             self.init_cache(cache)
 

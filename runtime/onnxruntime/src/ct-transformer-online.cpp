@@ -54,6 +54,7 @@ void CTTransformerOnline::InitPunc(const std::string &punc_model, const std::str
     */
 
 	m_tokenizer.OpenYaml(punc_config.c_str(), token_file.c_str());
+	m_tokenizer.JiebaInit(punc_config);
 }
 
 CTTransformerOnline::~CTTransformerOnline()

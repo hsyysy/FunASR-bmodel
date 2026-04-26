@@ -29,6 +29,22 @@ from funasr.train_utils.set_all_random_seed import set_all_random_seed
 from funasr.train_utils.load_pretrained_model import load_pretrained_model
 from funasr.utils import export_utils
 from funasr.utils import misc
+def is_npu_available():
+    """检查NPU是否可用。"""
+    try:
+        import torch_npu
+        return torch_npu.npu.is_available()
+    except ImportError:
+        return False
+
+def _resolve_ncpu(config, fallback=4):
+    """Return a positive integer representing CPU threads from config."""
+    value = config.get("ncpu", fallback)
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = fallback
+    return max(value, 1)
 
 try:
     from funasr.models.campplus.utils import sv_chunk, postprocess, distribute_spk
@@ -60,7 +76,7 @@ def prepare_data_iterator(data_in, input_len=None, data_type=None, key=None):
                     if data_in.endswith(".jsonl"):  # file.jsonl: json.dumps({"source": data})
                         lines = json.loads(line.strip())
                         data = lines["source"]
-                        key = data["key"] if "key" in data else key
+                        key = lines.get("key", key)
                     else:  # filelist, wav.scp, text.txt: id \t data or data
                         lines = line.strip().split(maxsplit=1)
                         data = lines[1] if len(lines) > 1 else lines[0]
@@ -135,6 +151,7 @@ class AutoModel:
             vad_kwargs["model_revision"] = kwargs.get("vad_model_revision", "master")
             vad_kwargs["device"] = kwargs["device"]
             vad_kwargs["dev_id"] = kwargs["dev_id"]
+            vad_kwargs.setdefault("ncpu", kwargs.get("ncpu", 4))
             vad_model, vad_kwargs = self.build_model(**vad_kwargs)
 
         # if punc_model is not None, build punc model else None
@@ -146,6 +163,7 @@ class AutoModel:
             punc_kwargs["model_revision"] = kwargs.get("punc_model_revision", "master")
             punc_kwargs["device"] = kwargs["device"]
             punc_kwargs["dev_id"] = kwargs["dev_id"]
+            punc_kwargs.setdefault("ncpu", kwargs.get("ncpu", 4))
             punc_model, punc_kwargs = self.build_model(**punc_kwargs)
 
         # if spk_model is not None, build spk model else None
@@ -160,6 +178,7 @@ class AutoModel:
             spk_kwargs["model_revision"] = kwargs.get("spk_model_revision", "master")
             spk_kwargs["device"] = kwargs["device"]
             spk_kwargs["dev_id"] = kwargs["dev_id"]
+            spk_kwargs.setdefault("ncpu", kwargs.get("ncpu", 4))
             spk_model, spk_kwargs = self.build_model(**spk_kwargs)
             self.cb_model = ClusterBackend(**cb_kwargs).to(kwargs["device"])
             spk_mode = kwargs.get("spk_mode", "punc_segment")
@@ -176,6 +195,7 @@ class AutoModel:
         self.spk_model = spk_model
         self.spk_kwargs = spk_kwargs
         self.model_path = kwargs.get("model_path")
+        self._store_base_configs()
 
     @staticmethod
     def build_model(**kwargs):
@@ -190,12 +210,16 @@ class AutoModel:
         if ((device =="cuda" and not torch.cuda.is_available())
             or (device == "xpu" and not torch.xpu.is_available())
             or (device == "mps" and not torch.backends.mps.is_available())
+            or (device == "npu" and not is_npu_available())
             or kwargs.get("ngpu", 1) == 0):
             device = "cpu"
             kwargs["batch_size"] = 1
         kwargs["device"] = device
 
-        torch.set_num_threads(kwargs.get("ncpu", 4))
+        ncpu = _resolve_ncpu(kwargs, 4)
+        kwargs["ncpu"] = ncpu
+        if torch.get_num_threads() != ncpu:
+            torch.set_num_threads(ncpu)
 
         # build tokenizer
         tokenizer = kwargs.get("tokenizer", None)
@@ -309,10 +333,21 @@ class AutoModel:
         return res
 
     def generate(self, input, input_len=None, progress_callback=None, **cfg):
+        self._reset_runtime_configs()
         if self.vad_model is None:
-            return self.inference(
+            results = self.inference(
                 input, input_len=input_len, progress_callback=progress_callback, **cfg
             )
+            if self.punc_model is not None:
+                deep_update(self.punc_kwargs, cfg)
+                for result in results:
+                    punc_res = self.inference(
+                        result["text"], model=self.punc_model, kwargs=self.punc_kwargs, **cfg
+                    )
+                    if cfg.get("return_raw_text", self.kwargs.get("return_raw_text", False)):
+                        result["raw_text"] = copy.copy(result["text"])
+                    result["text"] = punc_res[0]["text"]
+            return results
 
         else:
             return self.inference_with_vad(
@@ -329,6 +364,8 @@ class AutoModel:
         progress_callback=None,
         **cfg,
     ):
+        if kwargs is None:
+            self._reset_runtime_configs()
         kwargs = self.kwargs if kwargs is None else kwargs
         if "cache" in kwargs:
             kwargs.pop("cache")
@@ -406,6 +443,7 @@ class AutoModel:
         return asr_result_list
 
     def inference_with_vad(self, input, input_len=None, **cfg):
+        self._reset_runtime_configs()
         kwargs = self.kwargs
         # step.1: compute the vad model
         deep_update(self.vad_kwargs, cfg)
@@ -546,8 +584,12 @@ class AutoModel:
                         if k not in result:
                             result[k] = []
                         for t in restored_data[j][k]:
-                            t[0] += vadsegments[j][0]
-                            t[1] += vadsegments[j][0]
+                            if isinstance(t, dict):
+                                t["start_time"] = (float(t["start_time"]) * 1000 + int(vadsegments[j][0])) / 1000
+                                t["end_time"] = (float(t["end_time"]) * 1000 + int(vadsegments[j][0])) / 1000
+                            else:
+                                t[0] = int(t[0]) + int(vadsegments[j][0])
+                                t[1] = int(t[1]) + int(vadsegments[j][0])
                         result[k].extend(restored_data[j][k])
                     elif k == "spk_embedding":
                         if k not in result:
@@ -703,3 +745,37 @@ class AutoModel:
             export_dir = export_utils.export(model=model, data_in=data_list, **kwargs)
 
         return export_dir
+
+    def _store_base_configs(self):
+        """Snapshot base kwargs for all submodules to allow reset before inference."""
+        baseline = {}
+        for name in dir(self):
+            if not name.endswith("kwargs"):
+                continue
+            value = getattr(self, name, None)
+            if isinstance(value, dict):
+                baseline[name] = copy.deepcopy(value)
+        # include primary kwargs explicitly
+        baseline["kwargs"] = copy.deepcopy(self.kwargs)
+        self._base_kwargs_map = baseline
+
+    def _reset_runtime_configs(self):
+        """Ensure runtime kwargs reset to baseline defaults before inference."""
+        base_map = getattr(self, "_base_kwargs_map", None)
+        if not base_map:
+            return
+
+        for name, base in base_map.items():
+            restored = copy.deepcopy(base)
+            setattr(self, name, restored)
+
+        ncpu = _resolve_ncpu(self.kwargs, 4)
+        self.kwargs["ncpu"] = ncpu
+        for name, value in base_map.items():
+            if name == "kwargs":
+                continue
+            config = getattr(self, name, None)
+            if isinstance(config, dict):
+                config.setdefault("ncpu", ncpu)
+        if torch.get_num_threads() != ncpu:
+            torch.set_num_threads(ncpu)
