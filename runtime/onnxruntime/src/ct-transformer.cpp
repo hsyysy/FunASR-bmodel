@@ -27,6 +27,14 @@ void CTTransformer::InitPunc(const std::string &punc_model, const std::string &p
         assert(NULL != p_bmrt);
         bool ret = bmrt_load_bmodel(p_bmrt, punc_model.c_str());
         assert(true == ret);
+
+        const char** punc_net_names = nullptr;
+        bmrt_get_network_names(p_bmrt, &punc_net_names);
+        const bm_net_info_t* punc_net_info = bmrt_get_network_info(p_bmrt, punc_net_names[0]);
+        assert(NULL != punc_net_info);
+        punc_max_len = punc_net_info->stages[0].input_shapes[0].dims[1];
+        free(punc_net_names);
+
         LOG(INFO) << "Successfully load model from " << punc_model;
 
         unsigned p_chipid;
@@ -206,6 +214,10 @@ vector<int> CTTransformer::Infer(vector<int32_t> input_data)
     const char** net_names = names_guard.names;
     const bm_net_info_t* net_info = bmrt_get_network_info(p_bmrt, net_names[0]);
     assert(NULL != net_info);
+
+    if (punc_max_len > 0 && (int)input_data.size() > punc_max_len) {
+        input_data.erase(input_data.begin(), input_data.begin() + (input_data.size() - punc_max_len));
+    }
 
     BmrtDeviceMemGuard mem_guard(bm_handle, is_1688);
     bm_status_t status;

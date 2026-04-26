@@ -302,10 +302,11 @@ bool Audio::FfmpegLoad(const char *filename, bool copy2char){
         avformat_free_context(formatContext);
         return false;
     }
-    const AVCodec* codec = nullptr;
     AVCodecParameters* codecParameters = nullptr;
-    int audioStreamIndex = av_find_best_stream(formatContext, AVMEDIA_TYPE_AUDIO, -1, -1, &codec, 0);
+    int audioStreamIndex = av_find_best_stream(formatContext, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+    const AVCodec* codec = nullptr;
     if (audioStreamIndex >= 0) {
+        codec = avcodec_find_decoder(formatContext->streams[audioStreamIndex]->codecpar->codec_id);
         codecParameters = formatContext->streams[audioStreamIndex]->codecpar;
     }else {
         LOG(ERROR) << "Error: Could not open input file.";
@@ -483,10 +484,11 @@ bool Audio::FfmpegLoad(const char* buf, int n_file_len){
         avformat_free_context(formatContext);
         return false;
     }
-    const AVCodec* codec = nullptr;
     AVCodecParameters* codecParameters = nullptr;
-    int audioStreamIndex = av_find_best_stream(formatContext, AVMEDIA_TYPE_AUDIO, -1, -1, &codec, 0);
+    int audioStreamIndex = av_find_best_stream(formatContext, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+    const AVCodec* codec = nullptr;
     if (audioStreamIndex >= 0) {
+        codec = avcodec_find_decoder(formatContext->streams[audioStreamIndex]->codecpar->codec_id);
         codecParameters = formatContext->streams[audioStreamIndex]->codecpar;
     }
     AVCodecContext* codecContext = avcodec_alloc_context3(codec);

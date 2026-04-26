@@ -38,5 +38,6 @@ public:
 	// bmrt
 	bm_handle_t bm_handle;
 	void* p_bmrt = NULL;
+	int punc_max_len = 0;
 };
 } // namespace funasr
